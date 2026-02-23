@@ -367,13 +367,41 @@ public class GeminiService {
     private String stripMarkdownFences(String text) {
         if (text == null) return "{}";
         String trimmed = text.strip();
-        if (trimmed.startsWith("```")) {
-            int firstNewline = trimmed.indexOf('\n');
+
+        // Handle code fences that may appear anywhere in the response, e.g. when Gemini
+        // adds a preamble like "Here are the offers:\n```json\n[...]\n```"
+        int fenceStart = trimmed.indexOf("```");
+        if (fenceStart >= 0) {
+            // Skip the opening fence line (e.g. ```json or ```)
+            int firstNewline = trimmed.indexOf('\n', fenceStart);
             int lastFence = trimmed.lastIndexOf("```");
-            if (firstNewline > 0 && lastFence > firstNewline) {
+            if (firstNewline > fenceStart && lastFence > firstNewline) {
                 return trimmed.substring(firstNewline + 1, lastFence).strip();
             }
         }
+
+        // Also handle a response that starts with [ or { directly — return as-is
+        if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+            return trimmed;
+        }
+
+        // Last resort: find first [ or { (JSON array/object start) within the response
+        int arrayStart = trimmed.indexOf('[');
+        int objectStart = trimmed.indexOf('{');
+        if (arrayStart >= 0 || objectStart >= 0) {
+            int jsonStart;
+            if (arrayStart < 0) jsonStart = objectStart;
+            else if (objectStart < 0) jsonStart = arrayStart;
+            else jsonStart = Math.min(arrayStart, objectStart);
+
+            int arrayEnd = trimmed.lastIndexOf(']');
+            int objectEnd = trimmed.lastIndexOf('}');
+            int jsonEnd = Math.max(arrayEnd, objectEnd);
+            if (jsonEnd > jsonStart) {
+                return trimmed.substring(jsonStart, jsonEnd + 1);
+            }
+        }
+
         return trimmed;
     }
 
