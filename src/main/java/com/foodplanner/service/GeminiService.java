@@ -6,6 +6,7 @@ import com.foodplanner.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -399,7 +400,16 @@ public class GeminiService {
                 + "- Coop: https://www.coop.se/erbjudanden/{butiksnamn-med-bindestreck}-{numeriskt-butiks-id}/\n\n"
                 + "Svara med ENBART URL:en på en rad. Inga förklaringar, ingen markdown, inga citattecken.";
         try {
-            String response = callAi(prompt);
+            // Enable Google Search grounding so Gemini can look up the current store URL
+            // rather than relying solely on training data (which may be outdated).
+            GoogleGenAiChatOptions searchOptions = GoogleGenAiChatOptions.builder()
+                    .googleSearchRetrieval(true)
+                    .build();
+            String response = chatClient.prompt()
+                    .user(prompt)
+                    .options(searchOptions)
+                    .call()
+                    .content();
             if (response == null) return null;
             String url = response.trim().lines().findFirst().orElse("").trim();
             // Only return if it looks like a plausible HTTPS URL

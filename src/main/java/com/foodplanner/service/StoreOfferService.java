@@ -126,6 +126,12 @@ public class StoreOfferService {
                 "https://www.ica.se/erbjudanden/ica-kvantum-vasteras-1003447/"));
         KNOWN_STORES.add(new Store("ica-supermarket-malmo-centrum", "ICA Supermarket Malmö Centrum", "ica",
                 "https://www.ica.se/erbjudanden/ica-supermarket-malmo-centrum-1004494/"));
+        KNOWN_STORES.add(new Store("ica-supermarket-hansa", "ICA Supermarket Hansa", "ica",
+                "https://www.ica.se/erbjudanden/ica-supermarket-hansa-1004492/"));
+        KNOWN_STORES.add(new Store("ica-supermarket-triangeln", "ICA Supermarket Triangeln", "ica",
+                "https://www.ica.se/erbjudanden/ica-supermarket-triangeln-1004493/"));
+        KNOWN_STORES.add(new Store("ica-supermarket-mobilia", "ICA Supermarket Mobilia", "ica",
+                "https://www.ica.se/erbjudanden/ica-supermarket-mobilia-1004495/"));
         KNOWN_STORES.add(new Store("ica-supermarket-stockholm-ostermalm", "ICA Supermarket Stockholm Östermalm", "ica",
                 "https://www.ica.se/erbjudanden/ica-supermarket-stockholm-ostermalm-1003448/"));
         KNOWN_STORES.add(new Store("ica-supermarket-gothenburg-linnegatan", "ICA Supermarket Göteborg Linnégatan", "ica",
