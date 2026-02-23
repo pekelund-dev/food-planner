@@ -25,8 +25,18 @@ public class GeminiService {
 
     private static final String[] DAYS = {"MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"};
 
-    public GeminiService(@Autowired(required = false) ChatClient chatClient) {
-        this.chatClient = chatClient;
+    /**
+     * Inject ChatClient.Builder with required=false. Spring AI auto-configures
+     * ChatClient.Builder after all user @Configuration classes are processed,
+     * so services (initialized later) reliably receive it when the API key is set.
+     * Using @ConditionalOnBean in a user @Configuration class does NOT work because
+     * that condition is evaluated before auto-configurations run.
+     */
+    public GeminiService(@Autowired(required = false) ChatClient.Builder chatClientBuilder) {
+        this.chatClient = chatClientBuilder != null ? chatClientBuilder.build() : null;
+        if (this.chatClient != null) {
+            log.info("Gemini AI configured via Spring AI – AI-powered menus enabled");
+        }
     }
 
     private boolean isConfigured() {
