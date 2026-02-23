@@ -1,5 +1,7 @@
 package com.foodplanner.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.time.Instant;
 import java.util.List;
 
@@ -89,11 +91,13 @@ public class ShoppingList {
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
 
+    @JsonIgnore
     public long getCheckedCount() {
         if (items == null) return 0;
         return items.stream().filter(ShoppingItem::isChecked).count();
     }
 
+    @JsonIgnore
     public long getSaleItemCount() {
         if (items == null) return 0;
         return items.stream().filter(ShoppingItem::isOnSale).count();
