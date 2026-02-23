@@ -17,6 +17,13 @@
         </a>
     </div>
 
+    <!-- AI-estimated banner -->
+    <div th:if="${!#lists.isEmpty(selectedStores)}"
+         class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-center space-x-2">
+        <span>ℹ️</span>
+        <span>Offers are AI-estimated based on typical weekly promotions for your selected stores and may not reflect live prices. Click <strong>Refresh</strong> to generate the latest estimate.</span>
+    </div>
+
     <!-- No stores selected -->
     <div th:if="${#lists.isEmpty(selectedStores)}" class="card p-12 text-center">
         <div class="text-6xl mb-4">🏪</div>

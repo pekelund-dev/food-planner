@@ -379,56 +379,30 @@ public class GeminiService {
     // ---- Store offer fetching via Gemini ----
 
     /**
-     * Ask Gemini for the URL of a specific store's offers/erbjudanden page.
-     * Returns null when AI is not configured or the URL cannot be determined.
+     * Ask Gemini to generate plausible current weekly offers for a specific Swedish grocery store.
+     * Swedish grocery store websites are JavaScript SPAs; a plain HTTP GET only returns a shell
+     * with no product data. Instead, we ask Gemini to use its training knowledge of the store
+     * to produce realistic-looking typical weekly offers (products, sale prices, categories).
+     * Note: offers are AI-estimated and may not reflect the exact live promotions.
      */
-    public String findStoreOffersUrl(String storeName) {
-        if (!isConfigured()) return null;
-        String prompt = "What is the exact URL for the weekly offers page (in Swedish: 'erbjudanden') "
-                + "for this specific Swedish grocery store: \"" + storeName + "\"?\n\n"
-                + "Known URL patterns:\n"
-                + "- ICA stores: https://www.ica.se/erbjudanden/{store-slug}-{store-id}\n"
-                + "- Willys stores: https://www.willys.se/erbjudanden/{city}\n"
-                + "- Coop stores: https://www.coop.se/butiker-erbjudanden/erbjudanden/{store-slug}\n"
-                + "- Hemköp stores: https://www.hemkop.se/erbjudanden/{store-slug}\n"
-                + "- Lidl: https://www.lidl.se/erbjudanden\n\n"
-                + "Reply with ONLY the URL — no explanation, no markdown. "
-                + "If you are unsure or cannot determine it, return exactly: unknown";
-        try {
-            String result = callAi(prompt).strip();
-            // Validate: must start with http, be a single token, and parse as a valid URL
-            if (result.startsWith("http") && !result.contains(" ") && !result.contains("\n")) {
-                new java.net.URI(result).toURL(); // throws if invalid
-                log.info("Gemini found offers URL for '{}': {}", storeName, result);
-                return result;
-            }
-        } catch (java.net.MalformedURLException | java.net.URISyntaxException ignored) {
-            log.warn("Gemini returned an invalid URL for store '{}', ignoring", storeName);
-        } catch (Exception e) {
-            log.warn("Failed to ask Gemini for offers URL for '{}': {}", storeName, e.getMessage());
-        }
-        return null;
-    }
-
-    /**
-     * Ask Gemini to extract product offers from a store's HTML offer page content.
-     */
-    public List<StoreOffer> extractOffersFromHtml(String html, String storeName, String storeId) {
-        if (!isConfigured() || html == null || html.isBlank()) return List.of();
-        // Limit content to keep within token budget
-        String content = html.length() > 14000 ? html.substring(0, 14000) : html;
-        String prompt = "Extract all product offers from this HTML content of a Swedish grocery store's offer page.\n"
-                + "Store: " + storeName + "\n\n"
-                + "HTML:\n" + content + "\n\n"
+    public List<StoreOffer> generateOffersForStore(String storeName, String storeId) {
+        if (!isConfigured()) return List.of();
+        String prompt = "You are an expert on Swedish grocery stores and their typical weekly promotions.\n"
+                + "Generate 15–20 realistic current weekly offers (\"veckans erbjudanden\") for this store: \""
+                + storeName + "\"\n\n"
+                + "Use typical Swedish grocery product names and realistic Swedish krona prices.\n"
+                + "Include a variety of categories: Meat, Fish, Dairy, Produce, Pantry, Beverages, Snacks.\n"
+                + "Sale prices should be 10–50% lower than original prices.\n\n"
                 + "Return a JSON array only, no markdown fences:\n"
                 + "[{\"productName\": \"string\", \"salePrice\": number, \"originalPrice\": number, "
-                + "\"productCategory\": \"string\", \"unit\": \"string\"}]\n"
-                + "If no offers are found in the HTML, return an empty array [].";
+                + "\"productCategory\": \"string\", \"unit\": \"string\"}]";
         try {
             String response = callAi(prompt);
-            return parseExtractedOffers(stripMarkdownFences(response), storeName, storeId);
+            List<StoreOffer> offers = parseExtractedOffers(stripMarkdownFences(response), storeName, storeId);
+            log.info("Gemini generated {} offers for store '{}'", offers.size(), storeName);
+            return offers;
         } catch (Exception e) {
-            log.warn("Failed to extract offers from HTML for '{}': {}", storeName, e.getMessage());
+            log.warn("Failed to generate offers for '{}': {}", storeName, e.getMessage());
             return List.of();
         }
     }

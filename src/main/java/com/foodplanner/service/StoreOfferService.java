@@ -234,35 +234,14 @@ public class StoreOfferService {
     }
 
     /**
-     * Use Gemini to (1) find the store's erbjudanden URL, (2) fetch the HTML, (3) extract offers.
+     * Use Gemini to generate plausible current weekly offers for a specific store.
+     * Swedish grocery store websites are JavaScript SPAs — a plain HTTP GET returns only
+     * an HTML shell with no product data. We therefore ask Gemini directly to generate
+     * realistic offers based on its training knowledge of the store.
      */
     private List<StoreOffer> fetchOffersViaGemini(Store store) {
         if (geminiService == null) return List.of();
-
-        // Step 1: Ask Gemini for the offers page URL
-        String offersUrl = geminiService.findStoreOffersUrl(store.getName());
-        if (offersUrl == null) {
-            log.warn("Gemini could not determine offers URL for store '{}'", store.getName());
-            return List.of();
-        }
-
-        // Step 2: Fetch the page HTML
-        String html;
-        try {
-            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-            headers.set("User-Agent", "Mozilla/5.0 (compatible; FoodPlannerBot/1.0)");
-            headers.set("Accept", "text/html,application/xhtml+xml");
-            var entity = new org.springframework.http.HttpEntity<>(headers);
-            var response = restTemplate.exchange(offersUrl, org.springframework.http.HttpMethod.GET, entity, String.class);
-            html = response.getBody();
-            log.info("Fetched offers page for '{}' ({} chars)", store.getName(), html == null ? 0 : html.length());
-        } catch (Exception e) {
-            log.warn("Failed to fetch offers page '{}' for store '{}': {}", offersUrl, store.getName(), e.getMessage());
-            return List.of();
-        }
-
-        // Step 3: Ask Gemini to extract offers from the HTML
-        return geminiService.extractOffersFromHtml(html, store.getName(), store.getId());
+        return geminiService.generateOffersForStore(store.getName(), store.getId());
     }
 
     private void fetchAndSaveOffersForStore(String storeId) {
