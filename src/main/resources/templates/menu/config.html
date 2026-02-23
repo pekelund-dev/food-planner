@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::title}, ~{::main})}"
+      lang="en">
+<head>
+    <title>Menu Settings</title>
+</head>
+<body>
+<main th:fragment="content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="max-w-3xl">
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Menu Settings</h1>
+            <p class="text-gray-500 mt-1">Configure your AI menu generation preferences</p>
+        </div>
+
+        <form action="/menu/config" method="post" class="space-y-8">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+            <!-- Basic Settings -->
+            <div class="card p-6">
+                <h2 class="text-lg font-bold text-gray-800 mb-5 flex items-center space-x-2">
+                    <span>👥</span><span>Basic Settings</span>
+                </h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Number of People</label>
+                        <input type="number" name="numberOfPeople" min="1" max="20"
+                               th:value="${config.numberOfPeople}"
+                               class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Cuisine Preferences</label>
+                        <input type="text" name="cuisinePreferences"
+                               th:value="${config.cuisinePreferences}"
+                               placeholder="e.g. Italian, Asian, Nordic..."
+                               class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Dietary Preferences</label>
+                    <div class="flex flex-wrap gap-3">
+                        <th:block th:each="pref : ${ {'Vegetarian', 'Vegan', 'Gluten-free', 'Dairy-free', 'Low-carb', 'High-protein', 'Mediterranean', 'Paleo'} }">
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="checkbox" name="dietaryPreferences"
+                                       th:value="${pref}"
+                                       th:checked="${config.dietaryPreferences != null && config.dietaryPreferences.contains(pref)}"
+                                       class="w-4 h-4 accent-primary-600">
+                                <span class="text-sm text-gray-700" th:text="${pref}">Pref</span>
+                            </label>
+                        </th:block>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Allergies & Restrictions</label>
+                    <input type="text" name="allergies"
+                           th:value="${config.allergies != null ? config.allergies.toString().replace('[','').replace(']','') : ''}"
+                           placeholder="e.g. nuts, shellfish, eggs..."
+                           class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+                </div>
+            </div>
+
+            <!-- Meal Types -->
+            <div class="card p-6">
+                <h2 class="text-lg font-bold text-gray-800 mb-5 flex items-center space-x-2">
+                    <span>🍽️</span><span>Meal Types to Plan</span>
+                </h2>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <label class="flex items-center p-4 border-2 rounded-xl cursor-pointer hover:border-primary-300 transition-colors"
+                           th:classappend="${config.includeBreakfast ? 'border-primary-500 bg-primary-50' : 'border-gray-200'}">
+                        <input type="checkbox" name="includeBreakfast"
+                               th:checked="${config.includeBreakfast}"
+                               class="w-5 h-5 accent-primary-600 mr-3">
+                        <div>
+                            <div class="text-xl mb-1">☀️</div>
+                            <span class="font-medium text-gray-800">Breakfast</span>
+                        </div>
+                    </label>
+                    <label class="flex items-center p-4 border-2 rounded-xl cursor-pointer hover:border-primary-300 transition-colors"
+                           th:classappend="${config.includeLunch ? 'border-primary-500 bg-primary-50' : 'border-gray-200'}">
+                        <input type="checkbox" name="includeLunch"
+                               th:checked="${config.includeLunch}"
+                               class="w-5 h-5 accent-primary-600 mr-3">
+                        <div>
+                            <div class="text-xl mb-1">🌤️</div>
+                            <span class="font-medium text-gray-800">Lunch</span>
+                        </div>
+                    </label>
+                    <label class="flex items-center p-4 border-2 rounded-xl cursor-pointer hover:border-primary-300 transition-colors"
+                           th:classappend="${config.includeDinner ? 'border-primary-500 bg-primary-50' : 'border-gray-200'}">
+                        <input type="checkbox" name="includeDinner"
+                               th:checked="${config.includeDinner}"
+                               class="w-5 h-5 accent-primary-600 mr-3">
+                        <div>
+                            <div class="text-xl mb-1">🌙</div>
+                            <span class="font-medium text-gray-800">Dinner</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Budget & Offers -->
+            <div class="card p-6">
+                <h2 class="text-lg font-bold text-gray-800 mb-5 flex items-center space-x-2">
+                    <span>💰</span><span>Budget &amp; Offers</span>
+                </h2>
+                <div class="space-y-4">
+                    <label class="flex items-center justify-between p-4 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50">
+                        <div>
+                            <p class="font-medium text-gray-800">Prefer budget-friendly meals</p>
+                            <p class="text-sm text-gray-500">AI will prioritize cost-effective recipes</p>
+                        </div>
+                        <input type="checkbox" name="preferBudgetFriendly"
+                               th:checked="${config.preferBudgetFriendly}"
+                               class="w-5 h-5 accent-primary-600">
+                    </label>
+                    <label class="flex items-center justify-between p-4 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50">
+                        <div>
+                            <p class="font-medium text-gray-800">Use store offers in menu planning</p>
+                            <p class="text-sm text-gray-500">AI will prioritize ingredients currently on sale</p>
+                        </div>
+                        <input type="checkbox" name="useStoreOffers"
+                               th:checked="${config.useStoreOffers}"
+                               class="w-5 h-5 accent-primary-600">
+                    </label>
+                </div>
+            </div>
+
+            <!-- Select Stores -->
+            <div class="card p-6">
+                <h2 class="text-lg font-bold text-gray-800 mb-5 flex items-center space-x-2">
+                    <span>🏪</span><span>Select Your Stores</span>
+                </h2>
+                <p class="text-sm text-gray-500 mb-4">Choose your preferred grocery stores for offer fetching</p>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <label th:each="entry : ${availableStores}"
+                           class="flex items-center space-x-3 p-4 border-2 rounded-xl cursor-pointer hover:border-primary-300 transition-colors"
+                           th:classappend="${selectedStoreIds.contains(entry.key) ? 'border-primary-500 bg-primary-50' : 'border-gray-200'}">
+                        <input type="checkbox" name="selectedStoreIds"
+                               th:value="${entry.key}"
+                               th:checked="${selectedStoreIds.contains(entry.key)}"
+                               class="w-4 h-4 accent-primary-600">
+                        <div>
+                            <span class="text-xl" th:text="${entry.value.icon}">🛒</span>
+                            <span class="font-medium text-gray-800 ml-1" th:text="${entry.value.name}">Store</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Additional Instructions -->
+            <div class="card p-6">
+                <h2 class="text-lg font-bold text-gray-800 mb-5 flex items-center space-x-2">
+                    <span>📝</span><span>Additional Instructions for AI</span>
+                </h2>
+                <textarea name="additionalInstructions"
+                          rows="4"
+                          th:text="${config.additionalInstructions}"
+                          placeholder="e.g. I love spicy food, prefer meals that can be prepared in under 30 minutes, include one vegetarian meal per week..."
+                          class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none resize-none"></textarea>
+                <p class="text-xs text-gray-500 mt-2">These instructions will be sent to Gemini AI when generating your menu.</p>
+            </div>
+
+            <!-- Save Button -->
+            <div class="flex justify-end space-x-3">
+                <a href="/dashboard" class="btn-secondary">Cancel</a>
+                <button type="submit" class="btn-primary flex items-center space-x-2">
+                    <span>💾</span>
+                    <span>Save Settings</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</main>
+</body>
+</html>

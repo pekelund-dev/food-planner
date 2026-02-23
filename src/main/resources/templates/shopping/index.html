@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::title}, ~{::main})}"
+      lang="en">
+<head>
+    <title>Shopping Lists</title>
+</head>
+<body>
+<main th:fragment="content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">Shopping Lists</h1>
+            <p class="text-gray-500 mt-1">Your grocery shopping lists</p>
+        </div>
+        <form th:action="'/shopping/generate/' + ${currentWeekId}" method="post">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="btn-primary flex items-center space-x-2">
+                <span>✨</span><span>Generate for This Week</span>
+            </button>
+        </form>
+    </div>
+
+    <div th:if="${#lists.isEmpty(lists)}" class="card p-12 text-center">
+        <div class="text-6xl mb-4">🛒</div>
+        <h2 class="text-xl font-bold text-gray-700 mb-2">No shopping lists yet</h2>
+        <p class="text-gray-500 mb-6">Generate a shopping list from your weekly menu</p>
+        <form th:action="'/shopping/generate/' + ${currentWeekId}" method="post" class="inline">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="btn-primary inline-flex items-center space-x-2">
+                <span>✨</span><span>Generate Shopping List</span>
+            </button>
+        </form>
+    </div>
+
+    <div th:if="${!#lists.isEmpty(lists)}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <a th:each="list : ${lists}"
+           th:href="'/shopping/' + ${list.id}"
+           class="card p-6 hover:shadow-md transition-shadow block">
+            <div class="flex items-start justify-between mb-4">
+                <div>
+                    <h3 class="font-bold text-gray-800" th:text="${list.name}">List Name</h3>
+                    <p class="text-sm text-gray-500 mt-1"
+                       th:text="${list.checkedCount + '/' + (list.items != null ? list.items.size() : 0) + ' items'}">0/0 items</p>
+                </div>
+                <span th:if="${list.completed}" class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-medium">Done ✓</span>
+                <span th:unless="${list.completed}" class="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full font-medium">Active</span>
+            </div>
+
+            <!-- Progress bar -->
+            <div class="w-full bg-gray-200 rounded-full h-2 mb-3">
+                <div class="bg-primary-500 h-2 rounded-full transition-all"
+                     th:style="'width: ' + ${list.items != null && list.items.size() > 0 ? (list.checkedCount * 100 / list.items.size()) : 0} + '%'"></div>
+            </div>
+
+            <!-- Sale items indicator -->
+            <div th:if="${list.saleItemCount > 0}"
+                 class="flex items-center space-x-1 text-xs text-green-600 font-medium">
+                <span>🏷️</span>
+                <span th:text="${list.saleItemCount + ' items on sale!'}">3 items on sale!</span>
+            </div>
+        </a>
+    </div>
+</main>
+</body>
+</html>

@@ -1,0 +1,29 @@
+# Compiled class files
+target/
+*.class
+*.jar
+
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.sw[op]
+
+# Logs
+*.log
+logs/
+
+# Firebase service account (never commit!)
+firebase-adminsdk*.json
+service-account*.json
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db

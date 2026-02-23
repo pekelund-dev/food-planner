@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::title}, ~{::main})}"
+      lang="en">
+<head>
+    <title>Recipes</title>
+</head>
+<body>
+<main th:fragment="content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">Recipes</h1>
+            <p class="text-gray-500 mt-1">Your saved recipes</p>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="document.getElementById('generateModal').classList.remove('hidden')"
+                    class="btn-primary flex items-center space-x-2">
+                <span>✨</span><span>Generate Recipe</span>
+            </button>
+            <a href="/recipes/new" class="btn-secondary flex items-center space-x-2">
+                <span>+</span><span>Add Recipe</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Empty state -->
+    <div th:if="${#lists.isEmpty(recipes)}" class="card p-12 text-center">
+        <div class="text-6xl mb-4">📖</div>
+        <h2 class="text-xl font-bold text-gray-700 mb-2">No recipes yet</h2>
+        <p class="text-gray-500 mb-6">Generate a recipe with AI or add one manually</p>
+        <button onclick="document.getElementById('generateModal').classList.remove('hidden')"
+                class="btn-primary inline-flex items-center space-x-2">
+            <span>✨</span><span>Generate with AI</span>
+        </button>
+    </div>
+
+    <!-- Recipe Grid -->
+    <div th:if="${!#lists.isEmpty(recipes)}"
+         class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div th:each="recipe : ${recipes}"
+             class="card hover:shadow-md transition-shadow">
+            <div class="p-6">
+                <div class="flex items-start justify-between mb-3">
+                    <h3 class="font-bold text-gray-800 text-lg" th:text="${recipe.name}">Recipe Name</h3>
+                    <span class="text-xs px-2 py-1 rounded-full font-medium ml-2"
+                          th:classappend="${recipe.difficulty?.name() == 'EASY' ? 'bg-green-100 text-green-700' :
+                                          (recipe.difficulty?.name() == 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')}"
+                          th:text="${recipe.difficulty?.name() ?: 'EASY'}">EASY</span>
+                </div>
+                <p class="text-sm text-gray-600 mb-4 line-clamp-2" th:text="${recipe.description}">Description</p>
+
+                <div class="flex items-center justify-between text-sm text-gray-500 mb-4">
+                    <span class="flex items-center space-x-1">
+                        <span>⏱️</span>
+                        <span th:text="${recipe.totalTimeMinutes + ' min'}">45 min</span>
+                    </span>
+                    <span class="flex items-center space-x-1">
+                        <span>👥</span>
+                        <span th:text="${recipe.servings + ' servings'}">2 servings</span>
+                    </span>
+                    <span th:if="${recipe.averageRating > 0}" class="flex items-center space-x-1">
+                        <span>⭐</span>
+                        <span th:text="${#numbers.formatDecimal(recipe.averageRating, 1, 1)}">4.5</span>
+                    </span>
+                </div>
+
+                <div th:if="${recipe.tags != null && !recipe.tags.isEmpty()}" class="flex flex-wrap gap-1 mb-4">
+                    <span th:each="tag : ${recipe.tags}"
+                          class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full"
+                          th:text="${tag}">tag</span>
+                </div>
+
+                <a th:href="'/recipes/' + ${recipe.id}"
+                   class="btn-secondary w-full text-center text-sm block">View Recipe</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Generate Modal -->
+    <div id="generateModal"
+         class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-8">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">✨ Generate Recipe with AI</h3>
+            <p class="text-gray-600 mb-6">Enter a meal name and Gemini AI will create a full recipe.</p>
+            <form action="/recipes/generate" method="post">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <input type="text" name="mealName" required
+                       placeholder="e.g. Chicken Tikka Masala, Beef Tacos..."
+                       class="w-full border border-gray-300 rounded-xl px-4 py-3 mb-4 focus:ring-2 focus:ring-primary-500 outline-none">
+                <div class="flex gap-3">
+                    <button type="button"
+                            onclick="document.getElementById('generateModal').classList.add('hidden')"
+                            class="btn-secondary flex-1">Cancel</button>
+                    <button type="submit" class="btn-primary flex-1 flex items-center justify-center space-x-2">
+                        <span>✨</span><span>Generate</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+</body>
+</html>

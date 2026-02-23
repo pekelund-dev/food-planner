@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<body>
+<div th:fragment="ratingsFragment">
+    <div th:if="${#lists.isEmpty(ratings)}" class="text-center text-gray-500 py-4 text-sm">
+        No ratings yet. Be the first to rate!
+    </div>
+    <div th:each="rating : ${ratings}" class="border-b border-gray-100 last:border-0 py-4">
+        <div class="flex items-center space-x-2 mb-1">
+            <div class="flex">
+                <span th:each="star : ${#numbers.sequence(1, 5)}"
+                      class="text-lg"
+                      th:classappend="${star <= rating.score ? 'text-yellow-400' : 'text-gray-300'}">★</span>
+            </div>
+            <span class="text-sm text-gray-500"
+                  th:text="${#temporals.format(rating.createdAt, 'MMM d, yyyy')}">Jan 1</span>
+        </div>
+        <p th:if="${rating.comment != null && !rating.comment.isBlank()}"
+           class="text-sm text-gray-700" th:text="${rating.comment}">Comment</p>
+    </div>
+</div>
+</body>
+</html>
