@@ -24,9 +24,6 @@ public class PlaywrightFetchService {
      */
     private static final int MAX_CONTENT_LENGTH = 80_000;
 
-    /** Characters to print in the INFO snippet to help diagnose what Playwright fetched. */
-    private static final int CONTENT_SNIPPET_LENGTH = 1000;
-
     /** Initial pause after first scroll-to-bottom, allowing first batch of lazy tiles to load. */
     private static final int LAZY_LOAD_INITIAL_WAIT_MS = 2000;
 
@@ -65,14 +62,11 @@ public class PlaywrightFetchService {
             String content = page.innerText("body");
             int rawLength = content != null ? content.length() : 0;
             log.info("Playwright fetched {} characters from {}", rawLength, url);
-            if (rawLength > 0) {
-                log.info("Page content snippet (first {} chars): {}",
-                        CONTENT_SNIPPET_LENGTH, content.substring(0, Math.min(CONTENT_SNIPPET_LENGTH, rawLength)));
-            }
             if (content != null && content.length() > MAX_CONTENT_LENGTH) {
                 log.info("Truncating content from {} to {} characters", rawLength, MAX_CONTENT_LENGTH);
                 content = content.substring(0, MAX_CONTENT_LENGTH);
             }
+            log.info("Playwright page content for {}:\n{}", url, content);
             return content != null ? content : "";
         } catch (Exception e) {
             log.warn("Playwright could not fetch {}: {}", url, e.getMessage());
