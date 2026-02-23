@@ -61,7 +61,7 @@ public class PlaywrightFetchService {
             // This handles infinite-scroll / progressively-loaded offer pages.
             long previousHeight = 0;
             for (int i = 0; i < MAX_SCROLL_ITERATIONS; i++) {
-                long currentHeight = (Long) page.evaluate("document.body.scrollHeight");
+                long currentHeight = ((Number) page.evaluate("document.body.scrollHeight")).longValue();
                 if (currentHeight == previousHeight) {
                     log.info("Page height stable at {} px after {} scroll(s) for {}", currentHeight, i, url);
                     break;
