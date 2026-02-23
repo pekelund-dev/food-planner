@@ -92,6 +92,13 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- Playwright: headless browser for fetching JS-rendered store offer pages -->
+        <dependency>
+            <groupId>com.microsoft.playwright</groupId>
+            <artifactId>playwright</artifactId>
+            <version>1.51.0</version>
+        </dependency>
+
         <!-- Spring Boot DevTools -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

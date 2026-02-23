@@ -376,14 +376,43 @@ public class GeminiService {
         return trimmed;
     }
 
-    // ---- Store offer fetching via Gemini ----
+    // ---- Store offer extraction ----
 
     /**
-     * Ask Gemini to generate plausible current weekly offers for a specific Swedish grocery store.
-     * Swedish grocery store websites are JavaScript SPAs; a plain HTTP GET only returns a shell
-     * with no product data. Instead, we ask Gemini to use its training knowledge of the store
-     * to produce realistic-looking typical weekly offers (products, sale prices, categories).
-     * Note: offers are AI-estimated and may not reflect the exact live promotions.
+     * Ask the AI to extract real product offers from rendered page content fetched by Playwright.
+     * The {@code pageContent} argument is the visible text of the store's offers page.
+     */
+    public List<StoreOffer> extractOffersFromHtml(String pageContent, String storeName, String storeId) {
+        if (!isConfigured()) return List.of();
+        // Strip control characters from the store name to prevent prompt injection
+        String safeName = storeName == null ? "" : storeName.replaceAll("[\\p{Cntrl}]", " ").trim();
+        String prompt = "You are extracting grocery store offer data from a web page.\n"
+                + "Store name: \"" + safeName + "\"\n\n"
+                + "Below is the visible text content of the store's current offers page:\n"
+                + "--- BEGIN CONTENT ---\n" + pageContent + "\n--- END CONTENT ---\n\n"
+                + "Extract every product offer you can find. For each offer provide:\n"
+                + "- productName: the product name (string)\n"
+                + "- salePrice: the discounted/sale price in SEK (number)\n"
+                + "- originalPrice: the original/regular price in SEK (number, 0 if not shown)\n"
+                + "- productCategory: category such as Meat, Fish, Dairy, Produce, Pantry, Beverages, Snacks\n"
+                + "- unit: unit of measure shown (e.g. kg, st, förp, l)\n\n"
+                + "Return a JSON array only, no markdown fences:\n"
+                + "[{\"productName\": \"string\", \"salePrice\": number, \"originalPrice\": number, "
+                + "\"productCategory\": \"string\", \"unit\": \"string\"}]";
+        try {
+            String response = callAi(prompt);
+            List<StoreOffer> offers = parseExtractedOffers(stripMarkdownFences(response), storeName, storeId);
+            log.info("AI extracted {} offers from page content for store '{}'", offers.size(), storeName);
+            return offers;
+        } catch (Exception e) {
+            log.warn("Failed to extract offers from page content for '{}': {}", storeName, e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * Fallback: ask Gemini to generate plausible weekly offers based solely on its training
+     * knowledge of the store. Used when Playwright cannot fetch the live offers page.
      */
     public List<StoreOffer> generateOffersForStore(String storeName, String storeId) {
         if (!isConfigured()) return List.of();
@@ -399,10 +428,10 @@ public class GeminiService {
         try {
             String response = callAi(prompt);
             List<StoreOffer> offers = parseExtractedOffers(stripMarkdownFences(response), storeName, storeId);
-            log.info("Gemini generated {} offers for store '{}'", offers.size(), storeName);
+            log.info("Gemini generated {} fallback offers for store '{}'", offers.size(), storeName);
             return offers;
         } catch (Exception e) {
-            log.warn("Failed to generate offers for '{}': {}", storeName, e.getMessage());
+            log.warn("Failed to generate fallback offers for '{}': {}", storeName, e.getMessage());
             return List.of();
         }
     }

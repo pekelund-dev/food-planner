@@ -13,6 +13,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
@@ -29,6 +30,7 @@ public class StoreOfferService {
 
     private final FirebaseService firebaseService;
     private final GeminiService geminiService;
+    private final PlaywrightFetchService playwrightFetchService;
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
@@ -40,6 +42,35 @@ public class StoreOfferService {
 
     @Value("${stores.coop.enabled:false}")
     private boolean coopEnabled;
+
+    // Offer-page URLs per chain; values may be overridden in application.properties
+    @Value("${stores.ica.offers-url:https://www.ica.se/erbjudanden/}")
+    private String icaOffersUrl;
+
+    @Value("${stores.willys.offers-url:https://www.willys.se/erbjudanden/}")
+    private String willysOffersUrl;
+
+    @Value("${stores.coop.offers-url:https://www.coop.se/erbjudanden/}")
+    private String coopOffersUrl;
+
+    @Value("${stores.hemkop.offers-url:https://www.hemkop.se/erbjudanden/}")
+    private String hemkopOffersUrl;
+
+    @Value("${stores.lidl.offers-url:https://www.lidl.se/erbjudanden/}")
+    private String lidlOffersUrl;
+
+    // Built in @PostConstruct once @Value fields are injected
+    private Map<String, String> storeOfferUrls;
+
+    @PostConstruct
+    void initStoreOfferUrls() {
+        storeOfferUrls = new LinkedHashMap<>();
+        storeOfferUrls.put("ica",    icaOffersUrl);
+        storeOfferUrls.put("willys", willysOffersUrl);
+        storeOfferUrls.put("coop",   coopOffersUrl);
+        storeOfferUrls.put("hemkop", hemkopOffersUrl);
+        storeOfferUrls.put("lidl",   lidlOffersUrl);
+    }
 
     // In-memory cache of available store chains
     private static final Map<String, StoreInfo> AVAILABLE_STORES = new LinkedHashMap<>();
@@ -129,9 +160,11 @@ public class StoreOfferService {
     }
 
     public StoreOfferService(FirebaseService firebaseService,
-                             @Autowired(required = false) GeminiService geminiService) {
+                             @Autowired(required = false) GeminiService geminiService,
+                             @Autowired(required = false) PlaywrightFetchService playwrightFetchService) {
         this.firebaseService = firebaseService;
         this.geminiService = geminiService;
+        this.playwrightFetchService = playwrightFetchService;
     }
 
     public List<StoreOffer> getActiveOffers(String storeId) {
@@ -207,11 +240,12 @@ public class StoreOfferService {
     }
 
     /**
-     * Manually trigger offer refresh for a specific store using Gemini to find and parse offers.
-     * Falls back to chain-level refresh if Gemini is not configured.
+     * Manually trigger offer refresh for a specific store using Playwright to fetch the live
+     * offers page, then AI to extract product data from the rendered content.
+     * Falls back to chain-level refresh if neither Playwright nor AI is available.
      */
     public List<StoreOffer> refreshOffersForSpecificStore(Store store) {
-        List<StoreOffer> offers = fetchOffersViaGemini(store);
+        List<StoreOffer> offers = fetchOffersViaPlaywright(store);
         if (!offers.isEmpty()) {
             firebaseService.deleteExpiredOffers(store.getId());
             for (StoreOffer offer : offers) {
@@ -223,7 +257,7 @@ public class StoreOfferService {
             }
             log.info("Saved {} offers for store '{}'", offers.size(), store.getName());
         } else {
-            // Fallback: chain-level refresh when Gemini is unavailable
+            // Fallback: chain-level refresh when both Playwright and AI are unavailable
             String chainId = store.getChain() != null ? store.getChain() : store.getId();
             fetchAndSaveOffersForStore(chainId != null ? chainId : "");
             String offerId = store.getId() != null && !store.getId().isBlank() ? store.getId()
@@ -234,13 +268,35 @@ public class StoreOfferService {
     }
 
     /**
-     * Use Gemini to generate plausible current weekly offers for a specific store.
-     * Swedish grocery store websites are JavaScript SPAs — a plain HTTP GET returns only
-     * an HTML shell with no product data. We therefore ask Gemini directly to generate
-     * realistic offers based on its training knowledge of the store.
+     * Fetch real offers for a specific store by:
+     * 1. Using Playwright to navigate to the chain's offers page and capture rendered content.
+     * 2. Asking the AI to extract structured offer data from that content.
+     * Falls back to asking the AI to generate typical offers from its training knowledge
+     * if Playwright cannot reach the page (e.g. browser binaries not installed, network error).
      */
-    private List<StoreOffer> fetchOffersViaGemini(Store store) {
+    private List<StoreOffer> fetchOffersViaPlaywright(Store store) {
         if (geminiService == null) return List.of();
+
+        String chainId = store.getChain() != null ? store.getChain() : store.getId();
+        String url = chainId != null ? storeOfferUrls.get(chainId) : null;
+
+        if (url != null && playwrightFetchService != null) {
+            String pageContent = playwrightFetchService.fetchPageContent(url);
+            if (!pageContent.isBlank()) {
+                List<StoreOffer> offers = geminiService.extractOffersFromHtml(
+                        pageContent, store.getName(), store.getId());
+                if (!offers.isEmpty()) {
+                    return offers;
+                }
+                log.info("AI extracted no offers from Playwright content for '{}'; falling back to AI generation",
+                        store.getName());
+            } else {
+                log.info("Playwright returned empty content for '{}'; falling back to AI generation",
+                        store.getName());
+            }
+        }
+
+        // Fallback: ask AI to generate typical offers from its training knowledge
         return geminiService.generateOffersForStore(store.getName(), store.getId());
     }
 
