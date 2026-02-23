@@ -390,16 +390,14 @@ public class GeminiService {
     public String findOffersUrl(String storeName, String chain, String chainBase) {
         if (!isConfigured()) return null;
         String safeName = storeName == null ? "" : storeName.replaceAll("[\\p{Cntrl}]", " ").trim();
-        String safeChain = chain == null ? "" : chain.replaceAll("[\\p{Cntrl}]", " ").trim();
-        String prompt = "You are an expert on Swedish grocery store websites.\n"
-                + "Store name: \"" + safeName + "\"\n"
-                + "Chain: \"" + safeChain + "\"\n"
-                + (chainBase != null ? "The chain's generic offers base URL is: " + chainBase + "\n" : "")
-                + "\nFor ICA stores the pattern is: https://www.ica.se/erbjudanden/{store-slug}-{numeric-id}/\n"
-                + "For Willys stores the pattern is: https://www.willys.se/erbjudanden/{store-slug}-{numeric-id}/\n"
-                + "For Coop stores the pattern is: https://www.coop.se/erbjudanden/{store-slug}-{numeric-id}/\n"
-                + "\nWhat is the store-specific offers page URL for this store?\n"
-                + "Reply with ONLY the URL on a single line. No explanation, no markdown, no quotes.";
+        String prompt = "Vilken URL används för veckans erbjudanden från \"" + safeName + "\" på dess butiksspecifika sida?\n\n"
+                + "URL-mönstret för svenska matbutikskedjor:\n"
+                + "- ICA: https://www.ica.se/erbjudanden/{butiksnamn-med-bindestreck}-{numeriskt-butiks-id}/\n"
+                + "  Exempel: ICA Kvantum Malmborgs Caroli → https://www.ica.se/erbjudanden/ica-kvantum-malmborgs-caroli-1004490/\n"
+                + "  Exempel: ICA Maxi Haninge → https://www.ica.se/erbjudanden/ica-maxi-haninge-1003434/\n"
+                + "- Willys: https://www.willys.se/erbjudanden/{butiksnamn-med-bindestreck}-{numeriskt-butiks-id}/\n"
+                + "- Coop: https://www.coop.se/erbjudanden/{butiksnamn-med-bindestreck}-{numeriskt-butiks-id}/\n\n"
+                + "Svara med ENBART URL:en på en rad. Inga förklaringar, ingen markdown, inga citattecken.";
         try {
             String response = callAi(prompt);
             if (response == null) return null;
@@ -409,7 +407,7 @@ public class GeminiService {
                 log.info("Gemini inferred offers URL for '{}': {}", storeName, url);
                 return url;
             }
-            log.debug("Gemini did not return a valid URL for '{}': {}", storeName, url);
+            log.info("Gemini did not return a valid URL for '{}', got: {}", storeName, url);
             return null;
         } catch (Exception e) {
             log.debug("Failed to infer offers URL for '{}' via Gemini: {}", storeName, e.getMessage());

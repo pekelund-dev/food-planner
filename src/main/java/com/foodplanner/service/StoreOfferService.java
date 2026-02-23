@@ -130,6 +130,24 @@ public class StoreOfferService {
                 "https://www.ica.se/erbjudanden/ica-supermarket-stockholm-ostermalm-1003448/"));
         KNOWN_STORES.add(new Store("ica-supermarket-gothenburg-linnegatan", "ICA Supermarket Göteborg Linnégatan", "ica",
                 "https://www.ica.se/erbjudanden/ica-supermarket-goteborg-linnegatan-1004775/"));
+        KNOWN_STORES.add(new Store("ica-kvantum-emporia", "ICA Kvantum Emporia", "ica",
+                "https://www.ica.se/erbjudanden/ica-kvantum-emporia-1004491/"));
+        KNOWN_STORES.add(new Store("ica-kvantum-gothenburg-sisjön-city", "ICA Kvantum Göteborg Sisjön City", "ica",
+                "https://www.ica.se/erbjudanden/ica-kvantum-goteborg-sisjon-city-1004776/"));
+        KNOWN_STORES.add(new Store("ica-kvantum-stockholm-skarpnack", "ICA Kvantum Stockholm Skarpnäck", "ica",
+                "https://www.ica.se/erbjudanden/ica-kvantum-stockholm-skarpnack-1005473/"));
+        KNOWN_STORES.add(new Store("ica-kvantum-linkoping", "ICA Kvantum Linköping", "ica",
+                "https://www.ica.se/erbjudanden/ica-kvantum-linkoping-1003449/"));
+        KNOWN_STORES.add(new Store("ica-kvantum-umea", "ICA Kvantum Umeå", "ica",
+                "https://www.ica.se/erbjudanden/ica-kvantum-umea-1003450/"));
+        KNOWN_STORES.add(new Store("ica-kvantum-orebro", "ICA Kvantum Örebro", "ica",
+                "https://www.ica.se/erbjudanden/ica-kvantum-orebro-1003451/"));
+        KNOWN_STORES.add(new Store("ica-maxi-linkoping", "ICA Maxi Linköping", "ica",
+                "https://www.ica.se/erbjudanden/ica-maxi-linkoping-1003435/"));
+        KNOWN_STORES.add(new Store("ica-maxi-umea", "ICA Maxi Umeå", "ica",
+                "https://www.ica.se/erbjudanden/ica-maxi-umea-1003436/"));
+        KNOWN_STORES.add(new Store("ica-maxi-orebro", "ICA Maxi Örebro", "ica",
+                "https://www.ica.se/erbjudanden/ica-maxi-orebro-1003437/"));
         KNOWN_STORES.add(new Store("ica-nara-malmo", "ICA Nära Malmö", "ica"));
         KNOWN_STORES.add(new Store("ica-nara-stockholm", "ICA Nära Stockholm", "ica"));
 
