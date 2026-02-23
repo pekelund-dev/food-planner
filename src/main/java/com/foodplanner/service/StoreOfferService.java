@@ -42,12 +42,18 @@ public class StoreOfferService {
     private static final Map<String, StoreInfo> AVAILABLE_STORES = new LinkedHashMap<>();
 
     static {
-        AVAILABLE_STORES.put("ica", new StoreInfo("ica", "ICA", "🛒"));
-        AVAILABLE_STORES.put("willys", new StoreInfo("willys", "Willys", "🛒"));
-        AVAILABLE_STORES.put("coop", new StoreInfo("coop", "Coop", "🛒"));
-        AVAILABLE_STORES.put("hemkop", new StoreInfo("hemkop", "Hemköp", "🛒"));
-        AVAILABLE_STORES.put("lidl", new StoreInfo("lidl", "Lidl", "🛒"));
-        AVAILABLE_STORES.put("mathem", new StoreInfo("mathem", "Mathem", "🛒"));
+        AVAILABLE_STORES.put("ica", new StoreInfo("ica", "ICA", "🛒",
+                "Sweden's largest grocery chain, ~1 300 stores nationwide"));
+        AVAILABLE_STORES.put("willys", new StoreInfo("willys", "Willys", "🏷️",
+                "Budget-friendly discount chain, ~200 stores in Sweden"));
+        AVAILABLE_STORES.put("coop", new StoreInfo("coop", "Coop", "🌿",
+                "Consumer cooperative with fresh produce focus, ~800 stores"));
+        AVAILABLE_STORES.put("hemkop", new StoreInfo("hemkop", "Hemköp", "🛍️",
+                "Axfood quality chain, ~230 stores across Sweden"));
+        AVAILABLE_STORES.put("lidl", new StoreInfo("lidl", "Lidl", "🔵",
+                "International discount chain, ~200 stores in Sweden"));
+        AVAILABLE_STORES.put("mathem", new StoreInfo("mathem", "Mathem", "📦",
+                "Online grocery delivery service across Sweden"));
     }
 
     public StoreOfferService(FirebaseService firebaseService) {
@@ -247,15 +253,18 @@ public class StoreOfferService {
         private final String id;
         private final String name;
         private final String icon;
+        private final String description;
 
-        public StoreInfo(String id, String name, String icon) {
+        public StoreInfo(String id, String name, String icon, String description) {
             this.id = id;
             this.name = name;
             this.icon = icon;
+            this.description = description;
         }
 
         public String getId() { return id; }
         public String getName() { return name; }
         public String getIcon() { return icon; }
+        public String getDescription() { return description; }
     }
 }

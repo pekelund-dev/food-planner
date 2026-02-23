@@ -39,12 +39,10 @@
                     <span class="text-xl" th:text="${entry.value.icon}">🛒</span>
                     <span class="font-medium text-gray-800" th:text="${entry.value.name}">Store</span>
                 </div>
-                <button th:attr="hx-post='/stores/' + ${entry.key} + '/refresh',
-                                 hx-target='#offers-' + ${entry.key},
-                                 hx-swap='innerHTML',
-                                 hx-indicator='#spinner-' + ${entry.key}"
+                <button th:attr="hx-post='/stores/' + ${entry.key} + '/refresh'"
+                        hx-on::after-request="window.location.reload()"
                         class="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center space-x-1">
-                    <span id="spinner-${entry.key}" class="htmx-indicator">⏳</span>
+                    <span class="htmx-indicator">⏳</span>
                     <span>🔄 Refresh</span>
                 </button>
             </div>
