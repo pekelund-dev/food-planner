@@ -12,8 +12,10 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Controller
 @RequestMapping("/menu")
@@ -82,7 +84,7 @@ public class MenuController {
         String userId = principal.getAttribute("sub");
         firebaseService.saveMenuConfig(userId, config);
         List<Store> stores = new ArrayList<>();
-        java.util.Set<String> seenIds = new java.util.LinkedHashSet<>();
+        Set<String> seenIds = new LinkedHashSet<>();
         if (selectedStores != null) {
             for (String entry : selectedStores) {
                 // format: "id|name|chain"

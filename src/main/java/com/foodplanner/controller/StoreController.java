@@ -33,7 +33,7 @@ public class StoreController {
         List<Store> raw = user != null && user.getSelectedStores() != null
                 ? user.getSelectedStores() : List.of();
         List<Store> selectedStores = new ArrayList<>();
-        java.util.Set<String> seen = new java.util.LinkedHashSet<>();
+        Set<String> seen = new LinkedHashSet<>();
         for (Store s : raw) {
             if (s.hasValidId() && seen.add(s.getId())) {
                 selectedStores.add(s);
