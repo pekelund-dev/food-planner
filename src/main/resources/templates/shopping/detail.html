@@ -43,47 +43,48 @@
              class="space-y-4" id="shoppingItems">
 
             <!-- Group by category -->
-            <div th:each="category : ${ {'Produce', 'Meat', 'Dairy', 'Pantry', 'Frozen', 'Bakery', 'Beverages', 'Other'} }">
-                <div th:with="categoryItems=${list.items.?[category == #this.category]}"
-                     th:if="${!categoryItems.isEmpty()}">
-                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 px-1"
-                        th:text="${category}">Category</h3>
-                    <div class="card divide-y divide-gray-100">
-                        <div th:each="item : ${categoryItems}"
-                             class="flex items-center justify-between px-5 py-4 group"
-                             th:classappend="${item.checked ? 'opacity-60 bg-gray-50' : ''}">
-                            <div class="flex items-center space-x-4 flex-1">
-                                <input type="checkbox"
-                                       th:checked="${item.checked}"
-                                       class="w-5 h-5 accent-primary-600 cursor-pointer flex-shrink-0"
-                                       th:attr="data-item-id=${item.id}"
-                                       onchange="toggleCheck(this, this.dataset.itemId)">
-                                <div class="flex-1">
-                                    <span class="font-medium text-gray-800"
-                                          th:classappend="${item.checked ? 'line-through text-gray-400' : ''}"
-                                          th:text="${item.name}">Item</span>
-                                    <span class="text-sm text-gray-500 ml-2"
-                                          th:text="${item.amount + ' ' + (item.unit ?: '')}">200 g</span>
-                                    <span th:if="${item.mealName != null}"
-                                          class="text-xs text-gray-400 block mt-0.5"
-                                          th:text="'For: ' + ${item.mealName}">For: Pasta</span>
+            <th:block th:each="category : ${ {'Produce', 'Meat', 'Dairy', 'Pantry', 'Frozen', 'Bakery', 'Beverages', 'Other'} }">
+                <th:block th:with="categoryItems=${list.items.?[#this.category == category]}">
+                    <div th:if="${categoryItems != null && !categoryItems.isEmpty()}">
+                        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 px-1"
+                            th:text="${category}">Category</h3>
+                        <div class="card divide-y divide-gray-100">
+                            <div th:each="item : ${categoryItems}"
+                                 class="flex items-center justify-between px-5 py-4 group"
+                                 th:classappend="${item.checked ? 'opacity-60 bg-gray-50' : ''}">
+                                <div class="flex items-center space-x-4 flex-1">
+                                    <input type="checkbox"
+                                           th:checked="${item.checked}"
+                                           class="w-5 h-5 accent-primary-600 cursor-pointer flex-shrink-0"
+                                           th:attr="data-item-id=${item.id}"
+                                           onchange="toggleCheck(this, this.dataset.itemId)">
+                                    <div class="flex-1">
+                                        <span class="font-medium text-gray-800"
+                                              th:classappend="${item.checked ? 'line-through text-gray-400' : ''}"
+                                              th:text="${item.name}">Item</span>
+                                        <span class="text-sm text-gray-500 ml-2"
+                                              th:text="${item.amount + ' ' + (item.unit ?: '')}">200 g</span>
+                                        <span th:if="${item.mealName != null}"
+                                              class="text-xs text-gray-400 block mt-0.5"
+                                              th:text="'For: ' + ${item.mealName}">For: Pasta</span>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="flex items-center space-x-2 ml-3">
-                                <span th:if="${item.onSale}"
-                                      class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium flex items-center space-x-1">
-                                    <span>🏷️</span>
-                                    <span th:text="${item.storeName != null ? item.storeName : 'On sale'}">On sale</span>
-                                </span>
+                                <div class="flex items-center space-x-2 ml-3">
+                                    <span th:if="${item.onSale}"
+                                          class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium flex items-center space-x-1">
+                                        <span>🏷️</span>
+                                        <span th:text="${item.storeName != null ? item.storeName : 'On sale'}">On sale</span>
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
+                </th:block>
+            </th:block>
 
             <!-- Uncategorized items -->
-            <div th:with="otherItems=${list.items.?[category == null || category.isEmpty()]}">
-                <div th:if="${!otherItems.isEmpty()}">
+            <th:block th:with="otherItems=${list.items.?[#this.category == null || #this.category.isEmpty()]}">
+                <div th:if="${otherItems != null && !otherItems.isEmpty()}">
                     <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 px-1">Other</h3>
                     <div class="card divide-y divide-gray-100">
                         <div th:each="item : ${otherItems}"
@@ -102,7 +103,7 @@
                         </div>
                     </div>
                 </div>
-            </div>
+            </th:block>
         </div>
 
         <div th:if="${list.items == null || list.items.isEmpty()}"
