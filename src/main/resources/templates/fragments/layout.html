@@ -26,6 +26,10 @@
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.10" crossorigin="anonymous"></script>
 
+    <!-- CSRF token for HTMX requests -->
+    <meta name="csrf-token" th:content="${_csrf.token}">
+    <meta name="csrf-header" th:content="${_csrf.headerName}">
+
     <!-- Custom styles -->
     <style>
         .nav-link { @apply text-gray-600 hover:text-primary-600 font-medium transition-colors; }
@@ -157,6 +161,15 @@
             const menu = document.getElementById('mobileMenu');
             menu.classList.toggle('hidden');
         }
+
+        // Inject CSRF token into all HTMX requests automatically
+        document.addEventListener('htmx:configRequest', function(evt) {
+            const token = document.querySelector('meta[name="csrf-token"]')?.content;
+            const header = document.querySelector('meta[name="csrf-header"]')?.content || 'X-CSRF-TOKEN';
+            if (token) {
+                evt.detail.headers[header] = token;
+            }
+        });
     </script>
 </body>
 </html>
