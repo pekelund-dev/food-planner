@@ -163,7 +163,8 @@
                             <button type="button" onclick="removeStore(this)"
                                     class="text-red-400 hover:text-red-600 font-bold text-lg leading-none ml-3">✕</button>
                             <input type="hidden" name="selectedStores"
-                                   th:value="${store.id + '|' + store.name + '|' + store.chain}">
+                                   th:value="${store.id + '|' + store.name + '|' + store.chain}"
+                                   th:attr="data-id=${store.id}">
                         </div>
                     </th:block>
                 </div>

@@ -82,11 +82,12 @@ public class MenuController {
         String userId = principal.getAttribute("sub");
         firebaseService.saveMenuConfig(userId, config);
         List<Store> stores = new ArrayList<>();
+        java.util.Set<String> seenIds = new java.util.LinkedHashSet<>();
         if (selectedStores != null) {
             for (String entry : selectedStores) {
                 // format: "id|name|chain"
                 String[] parts = entry.split("\\|", 3);
-                if (parts.length == 3) {
+                if (parts.length == 3 && !parts[0].isBlank() && seenIds.add(parts[0])) {
                     stores.add(new Store(parts[0], parts[1], parts[2]));
                 }
             }

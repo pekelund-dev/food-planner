@@ -29,14 +29,20 @@ public class StoreController {
     public String storeOffers(@AuthenticationPrincipal OAuth2User principal, Model model) {
         String userId = principal.getAttribute("sub");
         var user = firebaseService.getUser(userId);
-        List<Store> selectedStores = user != null && user.getSelectedStores() != null
+        // Deduplicate by store ID to handle stale duplicate entries in Firestore
+        List<Store> raw = user != null && user.getSelectedStores() != null
                 ? user.getSelectedStores() : List.of();
+        List<Store> selectedStores = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.LinkedHashSet<>();
+        for (Store s : raw) {
+            if (s.hasValidId() && seen.add(s.getId())) {
+                selectedStores.add(s);
+            }
+        }
 
         List<StoreOffer> allOffers = new ArrayList<>();
         for (Store store : selectedStores) {
-            if (store.hasValidId()) {
-                allOffers.addAll(storeOfferService.getActiveOffers(store.getId()));
-            }
+            allOffers.addAll(storeOfferService.getActiveOffers(store.getId()));
         }
 
         model.addAttribute("offers", allOffers);
