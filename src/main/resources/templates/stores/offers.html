@@ -30,18 +30,17 @@
     <!-- Store sections -->
     <div th:if="${!#lists.isEmpty(selectedStores)}" class="space-y-8">
 
-        <!-- Selected stores with refresh buttons (one card per chain) -->
+        <!-- Selected stores with per-store refresh buttons -->
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <div th:each="entry : ${availableStores}"
-                 th:if="${chainIds.contains(entry.key)}"
+            <div th:each="store : ${selectedStores}"
                  class="card p-4 flex items-center justify-between">
-                <div class="flex items-center space-x-2">
-                    <span class="text-xl" th:text="${entry.value.icon}">🛒</span>
-                    <span class="font-medium text-gray-800" th:text="${entry.value.name}">Store</span>
+                <div>
+                    <p class="font-medium text-gray-800 text-sm" th:text="${store.name}">Store</p>
+                    <p class="text-xs text-gray-400 uppercase" th:text="${store.chain}">chain</p>
                 </div>
-                <button th:attr="hx-post='/stores/' + ${entry.key} + '/refresh'"
+                <button th:attr="hx-post='/stores/' + ${store.id} + '/refresh'"
                         hx-on::after-request="window.location.reload()"
-                        class="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center space-x-1">
+                        class="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center space-x-1 ml-2 flex-shrink-0">
                     <span>🔄 Refresh</span>
                 </button>
             </div>

@@ -6,6 +6,7 @@ import com.foodplanner.model.Store;
 import com.foodplanner.model.StoreOffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -27,6 +28,7 @@ public class StoreOfferService {
     private static final Logger log = LoggerFactory.getLogger(StoreOfferService.class);
 
     private final FirebaseService firebaseService;
+    private final GeminiService geminiService;
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
@@ -42,7 +44,10 @@ public class StoreOfferService {
     // In-memory cache of available store chains
     private static final Map<String, StoreInfo> AVAILABLE_STORES = new LinkedHashMap<>();
 
-    // Static catalogue of well-known Swedish grocery stores for autocomplete
+    // Static catalogue of well-known Swedish grocery stores for autocomplete.
+    // Seeded from public store directories on ica.se, willys.se, coop.se, hemkop.se, lidl.se, mathem.se.
+    // Users can add stores that aren't listed via the search field in Menu Settings — custom stores
+    // are saved to Firebase and appear in future autocomplete results.
     private static final List<Store> KNOWN_STORES = new ArrayList<>();
 
     static {
@@ -123,8 +128,10 @@ public class StoreOfferService {
         KNOWN_STORES.add(new Store("mathem-online", "Mathem (online delivery)", "mathem"));
     }
 
-    public StoreOfferService(FirebaseService firebaseService) {
+    public StoreOfferService(FirebaseService firebaseService,
+                             @Autowired(required = false) GeminiService geminiService) {
         this.firebaseService = firebaseService;
+        this.geminiService = geminiService;
     }
 
     public List<StoreOffer> getActiveOffers(String storeId) {
@@ -197,6 +204,65 @@ public class StoreOfferService {
     public List<StoreOffer> refreshOffersForStore(String storeId) {
         fetchAndSaveOffersForStore(storeId);
         return getActiveOffers(storeId);
+    }
+
+    /**
+     * Manually trigger offer refresh for a specific store using Gemini to find and parse offers.
+     * Falls back to chain-level refresh if Gemini is not configured.
+     */
+    public List<StoreOffer> refreshOffersForSpecificStore(Store store) {
+        List<StoreOffer> offers = fetchOffersViaGemini(store);
+        if (!offers.isEmpty()) {
+            firebaseService.deleteExpiredOffers(store.getId());
+            for (StoreOffer offer : offers) {
+                try {
+                    firebaseService.saveStoreOffer(offer);
+                } catch (Exception e) {
+                    log.warn("Failed to save offer for {}: {}", store.getName(), e.getMessage());
+                }
+            }
+            log.info("Saved {} offers for store '{}'", offers.size(), store.getName());
+        } else {
+            // Fallback: chain-level refresh when Gemini is unavailable
+            String chainId = store.getChain() != null ? store.getChain() : store.getId();
+            fetchAndSaveOffersForStore(chainId != null ? chainId : "");
+            String offerId = store.getId() != null && !store.getId().isBlank() ? store.getId()
+                    : (store.getChain() != null ? store.getChain() : "");
+            return getActiveOffers(offerId);
+        }
+        return offers;
+    }
+
+    /**
+     * Use Gemini to (1) find the store's erbjudanden URL, (2) fetch the HTML, (3) extract offers.
+     */
+    private List<StoreOffer> fetchOffersViaGemini(Store store) {
+        if (geminiService == null) return List.of();
+
+        // Step 1: Ask Gemini for the offers page URL
+        String offersUrl = geminiService.findStoreOffersUrl(store.getName());
+        if (offersUrl == null) {
+            log.warn("Gemini could not determine offers URL for store '{}'", store.getName());
+            return List.of();
+        }
+
+        // Step 2: Fetch the page HTML
+        String html;
+        try {
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.set("User-Agent", "Mozilla/5.0 (compatible; FoodPlannerBot/1.0)");
+            headers.set("Accept", "text/html,application/xhtml+xml");
+            var entity = new org.springframework.http.HttpEntity<>(headers);
+            var response = restTemplate.exchange(offersUrl, org.springframework.http.HttpMethod.GET, entity, String.class);
+            html = response.getBody();
+            log.info("Fetched offers page for '{}' ({} chars)", store.getName(), html == null ? 0 : html.length());
+        } catch (Exception e) {
+            log.warn("Failed to fetch offers page '{}' for store '{}': {}", offersUrl, store.getName(), e.getMessage());
+            return List.of();
+        }
+
+        // Step 3: Ask Gemini to extract offers from the HTML
+        return geminiService.extractOffersFromHtml(html, store.getName(), store.getId());
     }
 
     private void fetchAndSaveOffersForStore(String storeId) {

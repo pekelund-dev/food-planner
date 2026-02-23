@@ -133,7 +133,7 @@
                     <span>🏪</span><span>Your Local Stores</span>
                 </h2>
                 <p class="text-sm text-gray-500 mb-5">
-                    Search for your specific store by name (e.g. "ICA Kvantum Caroli"). You can add multiple stores.
+                    Search for your specific store by name (e.g. "ICA Kvantum Caroli", "Willys Lund"). The list includes 60+ named Swedish stores seeded from public store directories. If your store isn't listed, type the name and click <strong>Add store</strong> to add it yourself.
                 </p>
 
                 <!-- Search input with HTMX autocomplete -->
@@ -173,6 +173,13 @@
                 <script>
                     function addStoreEl(el) {
                         addStore(el.dataset.storeId, el.dataset.storeName, el.dataset.storeChain);
+                    }
+                    function addCustomStoreEl(btn) {
+                        const chain = document.getElementById('newStoreChain')?.value || 'other';
+                        const name = btn.dataset.storeName;
+                        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+                        const id = 'custom-' + (slug || Date.now().toString(36));
+                        addStore(id, name, chain);
                     }
                     function addStore(id, name, chain) {
                         const list = document.getElementById('selected-stores-list');

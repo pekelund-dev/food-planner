@@ -55,15 +55,36 @@ public class StoreController {
     @GetMapping("/search")
     public String searchStores(@RequestParam(defaultValue = "") String q, Model model) {
         model.addAttribute("results", storeOfferService.searchStores(q));
+        model.addAttribute("q", q);
         return "fragments/store-suggestions :: results";
     }
 
     @PostMapping("/{storeId}/refresh")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> refreshOffers(
-            @PathVariable String storeId) {
-        List<StoreOffer> offers = storeOfferService.refreshOffersForStore(storeId);
-        return ResponseEntity.ok(Map.of("storeId", storeId, "count", offers.size()));
+            @PathVariable String storeId,
+            @AuthenticationPrincipal OAuth2User principal) {
+        String userId = principal != null ? principal.getAttribute("sub") : null;
+        if (userId == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Not authenticated"));
+        }
+        var user = firebaseService.getUser(userId);
+
+        // Look up the specific store from the user's saved stores
+        Store store = null;
+        if (user != null && user.getSelectedStores() != null) {
+            store = user.getSelectedStores().stream()
+                    .filter(s -> storeId.equals(s.getId()))
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (store == null) {
+            // Fallback: treat storeId as a chain key
+            store = new Store(storeId, storeId, storeId);
+        }
+
+        List<StoreOffer> offers = storeOfferService.refreshOffersForSpecificStore(store);
+        return ResponseEntity.ok(Map.of("storeId", storeId, "storeName", store.getName(), "count", offers.size()));
     }
 }
 

@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.IsoFields;
 import java.time.temporal.TemporalAdjusters;
@@ -373,6 +374,97 @@ public class GeminiService {
             }
         }
         return trimmed;
+    }
+
+    // ---- Store offer fetching via Gemini ----
+
+    /**
+     * Ask Gemini for the URL of a specific store's offers/erbjudanden page.
+     * Returns null when AI is not configured or the URL cannot be determined.
+     */
+    public String findStoreOffersUrl(String storeName) {
+        if (!isConfigured()) return null;
+        String prompt = "What is the exact URL for the weekly offers page (in Swedish: 'erbjudanden') "
+                + "for this specific Swedish grocery store: \"" + storeName + "\"?\n\n"
+                + "Known URL patterns:\n"
+                + "- ICA stores: https://www.ica.se/erbjudanden/{store-slug}-{store-id}\n"
+                + "- Willys stores: https://www.willys.se/erbjudanden/{city}\n"
+                + "- Coop stores: https://www.coop.se/butiker-erbjudanden/erbjudanden/{store-slug}\n"
+                + "- Hemköp stores: https://www.hemkop.se/erbjudanden/{store-slug}\n"
+                + "- Lidl: https://www.lidl.se/erbjudanden\n\n"
+                + "Reply with ONLY the URL — no explanation, no markdown. "
+                + "If you are unsure or cannot determine it, return exactly: unknown";
+        try {
+            String result = callAi(prompt).strip();
+            // Validate: must start with http, be a single token, and parse as a valid URL
+            if (result.startsWith("http") && !result.contains(" ") && !result.contains("\n")) {
+                new java.net.URI(result).toURL(); // throws if invalid
+                log.info("Gemini found offers URL for '{}': {}", storeName, result);
+                return result;
+            }
+        } catch (java.net.MalformedURLException | java.net.URISyntaxException ignored) {
+            log.warn("Gemini returned an invalid URL for store '{}', ignoring", storeName);
+        } catch (Exception e) {
+            log.warn("Failed to ask Gemini for offers URL for '{}': {}", storeName, e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Ask Gemini to extract product offers from a store's HTML offer page content.
+     */
+    public List<StoreOffer> extractOffersFromHtml(String html, String storeName, String storeId) {
+        if (!isConfigured() || html == null || html.isBlank()) return List.of();
+        // Limit content to keep within token budget
+        String content = html.length() > 14000 ? html.substring(0, 14000) : html;
+        String prompt = "Extract all product offers from this HTML content of a Swedish grocery store's offer page.\n"
+                + "Store: " + storeName + "\n\n"
+                + "HTML:\n" + content + "\n\n"
+                + "Return a JSON array only, no markdown fences:\n"
+                + "[{\"productName\": \"string\", \"salePrice\": number, \"originalPrice\": number, "
+                + "\"productCategory\": \"string\", \"unit\": \"string\"}]\n"
+                + "If no offers are found in the HTML, return an empty array [].";
+        try {
+            String response = callAi(prompt);
+            return parseExtractedOffers(stripMarkdownFences(response), storeName, storeId);
+        } catch (Exception e) {
+            log.warn("Failed to extract offers from HTML for '{}': {}", storeName, e.getMessage());
+            return List.of();
+        }
+    }
+
+    private List<StoreOffer> parseExtractedOffers(String json, String storeName, String storeId) {
+        List<StoreOffer> offers = new ArrayList<>();
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            if (!root.isArray()) return offers;
+            for (JsonNode node : root) {
+                StoreOffer offer = new StoreOffer();
+                offer.setId(UUID.randomUUID().toString());
+                offer.setStoreId(storeId);
+                offer.setStoreName(storeName);
+                offer.setProductName(node.path("productName").asText(""));
+                offer.setSalePrice(node.path("salePrice").asDouble(0));
+                offer.setOriginalPrice(node.path("originalPrice").asDouble(0));
+                offer.setProductCategory(node.path("productCategory").asText("Other"));
+                offer.setUnit(node.path("unit").asText(""));
+                offer.setFetchedAt(Instant.now());
+                offer.setValidFrom(LocalDate.now());
+                offer.setValidTo(LocalDate.now().plusDays(7));
+                if (offer.getOriginalPrice() > 0 && offer.getSalePrice() > 0
+                        && offer.getOriginalPrice() > offer.getSalePrice()) {
+                    double discount = ((offer.getOriginalPrice() - offer.getSalePrice())
+                            / offer.getOriginalPrice()) * 100;
+                    offer.setDiscountPercent(discount);
+                }
+                if (!offer.getProductName().isBlank()) {
+                    offers.add(offer);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse extracted offers JSON", e);
+        }
+        return offers;
     }
 
     // ---- Fallback sample data ----
