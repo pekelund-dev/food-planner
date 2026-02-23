@@ -379,6 +379,45 @@ public class GeminiService {
     // ---- Store offer extraction ----
 
     /**
+     * Ask Gemini to find the store-specific offers page URL for a Swedish grocery store.
+     * Used for custom stores that are not in the static KNOWN_STORES catalogue.
+     *
+     * @param storeName  full store name, e.g. "ICA Kvantum Malmborgs Caroli"
+     * @param chain      chain key, e.g. "ica"
+     * @param chainBase  chain-level offers URL as a reference, e.g. "https://www.ica.se/erbjudanden/"
+     * @return the store-specific URL, or {@code null} if Gemini cannot determine it
+     */
+    public String findOffersUrl(String storeName, String chain, String chainBase) {
+        if (!isConfigured()) return null;
+        String safeName = storeName == null ? "" : storeName.replaceAll("[\\p{Cntrl}]", " ").trim();
+        String safeChain = chain == null ? "" : chain.replaceAll("[\\p{Cntrl}]", " ").trim();
+        String prompt = "You are an expert on Swedish grocery store websites.\n"
+                + "Store name: \"" + safeName + "\"\n"
+                + "Chain: \"" + safeChain + "\"\n"
+                + (chainBase != null ? "The chain's generic offers base URL is: " + chainBase + "\n" : "")
+                + "\nFor ICA stores the pattern is: https://www.ica.se/erbjudanden/{store-slug}-{numeric-id}/\n"
+                + "For Willys stores the pattern is: https://www.willys.se/erbjudanden/{store-slug}-{numeric-id}/\n"
+                + "For Coop stores the pattern is: https://www.coop.se/erbjudanden/{store-slug}-{numeric-id}/\n"
+                + "\nWhat is the store-specific offers page URL for this store?\n"
+                + "Reply with ONLY the URL on a single line. No explanation, no markdown, no quotes.";
+        try {
+            String response = callAi(prompt);
+            if (response == null) return null;
+            String url = response.trim().lines().findFirst().orElse("").trim();
+            // Only return if it looks like a plausible HTTPS URL
+            if (url.startsWith("https://")) {
+                log.info("Gemini inferred offers URL for '{}': {}", storeName, url);
+                return url;
+            }
+            log.debug("Gemini did not return a valid URL for '{}': {}", storeName, url);
+            return null;
+        } catch (Exception e) {
+            log.debug("Failed to infer offers URL for '{}' via Gemini: {}", storeName, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Ask the AI to extract real product offers from rendered page content fetched by Playwright.
      * The {@code pageContent} argument is the visible text of the store's offers page.
      */

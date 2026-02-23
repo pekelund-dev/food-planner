@@ -81,6 +81,9 @@ public class StoreOfferService {
     // are saved to Firebase and appear in future autocomplete results.
     private static final List<Store> KNOWN_STORES = new ArrayList<>();
 
+    // Indexed version of KNOWN_STORES for O(1) look-up by store ID
+    private static final Map<String, Store> KNOWN_STORES_BY_ID = new HashMap<>();
+
     static {
         AVAILABLE_STORES.put("ica", new StoreInfo("ica", "ICA", "🛒",
                 "Sweden's largest grocery chain, ~1 300 stores nationwide"));
@@ -183,6 +186,11 @@ public class StoreOfferService {
 
         // Mathem
         KNOWN_STORES.add(new Store("mathem-online", "Mathem (online delivery)", "mathem"));
+
+        // Build the ID-indexed lookup map
+        for (Store s : KNOWN_STORES) {
+            KNOWN_STORES_BY_ID.put(s.getId(), s);
+        }
     }
 
     public StoreOfferService(FirebaseService firebaseService,
@@ -303,12 +311,13 @@ public class StoreOfferService {
     private List<StoreOffer> fetchOffersViaPlaywright(Store store) {
         if (geminiService == null) return List.of();
 
-        // Prefer store-specific URL; fall back to the chain's generic offers page
-        String url = store.getOffersUrl();
-        if (url == null || url.isBlank()) {
-            String chainId = store.getChain() != null ? store.getChain() : store.getId();
-            url = chainId != null ? storeOfferUrls.get(chainId) : null;
-        }
+        // Four-tier URL resolution:
+        // 1. Store-specific URL on the Store object (set for stores added after this feature)
+        // 2. Look up in KNOWN_STORES_BY_ID (covers stores that were saved to Firebase before
+        //    the offersUrl field was added — their Store objects in Firebase lack the field)
+        // 3. Ask Gemini to infer the URL from the store name (custom / unknown stores)
+        // 4. Chain-level generic URL as last resort
+        String url = resolveStoreOffersUrl(store);
 
         if (url != null && playwrightFetchService != null) {
             String pageContent = playwrightFetchService.fetchPageContent(url);
@@ -328,6 +337,48 @@ public class StoreOfferService {
 
         // Fallback: ask AI to generate typical offers from its training knowledge
         return geminiService.generateOffersForStore(store.getName(), store.getId());
+    }
+
+    /**
+     * Resolves the best available offers-page URL for a store:
+     * 1. The URL already present on the Store object (new stores / stores re-saved after update)
+     * 2. The URL from the static KNOWN_STORES catalogue (stores saved to Firebase before the
+     *    {@code offersUrl} field was added retain their old serialised form without the field)
+     * 3. Gemini's best guess at the URL from the store name (custom/unknown stores)
+     * 4. The chain-level generic fallback URL from application.properties
+     */
+    private String resolveStoreOffersUrl(Store store) {
+        // 1. Check the Store object itself
+        if (store.getOffersUrl() != null && !store.getOffersUrl().isBlank()) {
+            log.info("Using store-specific URL from Store object for '{}': {}", store.getName(), store.getOffersUrl());
+            return store.getOffersUrl();
+        }
+
+        // 2. Look up in the static KNOWN_STORES catalogue by store ID
+        if (store.getId() != null) {
+            Store known = KNOWN_STORES_BY_ID.get(store.getId());
+            if (known != null && known.getOffersUrl() != null && !known.getOffersUrl().isBlank()) {
+                log.info("Using store-specific URL from KNOWN_STORES for '{}': {}", store.getName(), known.getOffersUrl());
+                return known.getOffersUrl();
+            }
+        }
+
+        // 3. Ask Gemini to infer the URL (covers custom stores not in the catalogue)
+        if (geminiService != null) {
+            String chainId = store.getChain() != null ? store.getChain() : store.getId();
+            String chainBase = chainId != null ? storeOfferUrls.get(chainId) : null;
+            String geminiUrl = geminiService.findOffersUrl(store.getName(), store.getChain(), chainBase);
+            if (geminiUrl != null && !geminiUrl.isBlank()) {
+                log.info("Using Gemini-inferred URL for '{}': {}", store.getName(), geminiUrl);
+                return geminiUrl;
+            }
+        }
+
+        // 4. Chain-level generic fallback
+        String chainId = store.getChain() != null ? store.getChain() : store.getId();
+        String fallback = chainId != null ? storeOfferUrls.get(chainId) : null;
+        log.info("Using chain-level fallback URL for '{}': {}", store.getName(), fallback);
+        return fallback;
     }
 
     private void fetchAndSaveOffersForStore(String storeId) {
