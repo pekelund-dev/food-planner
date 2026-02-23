@@ -27,4 +27,7 @@ public class Store {
 
     public String getChain() { return chain; }
     public void setChain(String chain) { this.chain = chain; }
+
+    /** Returns true when this store has a non-blank ID suitable for offer lookups. */
+    public boolean hasValidId() { return id != null && !id.isBlank(); }
 }

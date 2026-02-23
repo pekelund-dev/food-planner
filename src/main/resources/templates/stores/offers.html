@@ -45,9 +45,11 @@
                     <p class="font-medium text-gray-800 text-sm" th:text="${store.name}">Store</p>
                     <p class="text-xs text-gray-400 uppercase" th:text="${store.chain}">chain</p>
                 </div>
-                <button th:attr="hx-post='/stores/' + ${store.id} + '/refresh'"
+                <button th:attr="hx-post='/stores/' + ${store.id} + '/refresh', hx-indicator='#spin-' + ${store.id}"
+                        hx-disabled-elt="this"
                         hx-on::after-request="window.location.reload()"
-                        class="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center space-x-1 ml-2 flex-shrink-0">
+                        class="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center space-x-1 ml-2 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span th:id="'spin-' + ${store.id}" class="htmx-indicator">⏳</span>
                     <span>🔄 Refresh</span>
                 </button>
             </div>

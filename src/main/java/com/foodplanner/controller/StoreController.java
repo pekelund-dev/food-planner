@@ -12,7 +12,6 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/stores")
@@ -33,20 +32,15 @@ public class StoreController {
         List<Store> selectedStores = user != null && user.getSelectedStores() != null
                 ? user.getSelectedStores() : List.of();
 
-        // Derive the unique chain IDs for offer fetching
-        Set<String> chainIds = selectedStores.stream()
-                .map(Store::getChain)
-                .filter(c -> c != null && !c.isBlank())
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-
         List<StoreOffer> allOffers = new ArrayList<>();
-        for (String chainId : chainIds) {
-            allOffers.addAll(storeOfferService.getActiveOffers(chainId));
+        for (Store store : selectedStores) {
+            if (store.hasValidId()) {
+                allOffers.addAll(storeOfferService.getActiveOffers(store.getId()));
+            }
         }
 
         model.addAttribute("offers", allOffers);
         model.addAttribute("selectedStores", selectedStores);
-        model.addAttribute("chainIds", chainIds);
         model.addAttribute("availableStores", storeOfferService.getAvailableStores());
         return "stores/offers";
     }

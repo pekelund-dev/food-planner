@@ -43,9 +43,20 @@ public class MenuService {
                 ? user.getMenuConfig() : new MenuConfig();
 
         List<StoreOffer> offers = new ArrayList<>();
-        if (user != null && user.getSelectedStoreIds() != null && config.isUseStoreOffers()) {
-            for (String storeId : user.getSelectedStoreIds()) {
-                offers.addAll(storeOfferService.getActiveOffers(storeId));
+        if (user != null && config.isUseStoreOffers()) {
+            List<Store> selectedStores = user.getSelectedStores() != null ? user.getSelectedStores() : List.of();
+            for (Store store : selectedStores) {
+                if (!store.hasValidId()) continue;
+                List<StoreOffer> storeOffers = storeOfferService.getActiveOffers(store.getId());
+                if (storeOffers.isEmpty()) {
+                    // Auto-fetch offers on first menu generation
+                    log.info("No offers cached for '{}', auto-fetching before menu generation", store.getName());
+                    storeOffers = storeOfferService.refreshOffersForSpecificStore(store);
+                    if (storeOffers.isEmpty()) {
+                        log.warn("Could not fetch offers for '{}' – menu will be generated without them", store.getName());
+                    }
+                }
+                offers.addAll(storeOffers);
             }
         }
 
