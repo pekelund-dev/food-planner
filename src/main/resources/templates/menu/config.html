@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::title}, ~{::main})}"
+      lang="en">
+<head>
+    <title>Menu Settings</title>
+</head>
+<body>
+<main th:fragment="content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="max-w-3xl">
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Menu Settings</h1>
+            <p class="text-gray-500 mt-1">Configure your AI menu generation preferences</p>
+        </div>
+
+        <form action="/menu/config" method="post" class="space-y-8">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+            <!-- Basic Settings -->
+            <div class="card p-6">
+                <h2 class="text-lg font-bold text-gray-800 mb-5 flex items-center space-x-2">
+                    <span>👥</span><span>Basic Settings</span>
+                </h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Number of People</label>
+                        <input type="number" name="numberOfPeople" min="1" max="20"
+                               th:value="${config.numberOfPeople}"
+                               class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Cuisine Preferences</label>
+                        <input type="text" name="cuisinePreferences"
+                               th:value="${config.cuisinePreferences}"
+                               placeholder="e.g. Italian, Asian, Nordic..."
+                               class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Dietary Preferences</label>
+                    <div class="flex flex-wrap gap-3">
+                        <th:block th:each="pref : ${ {'Vegetarian', 'Vegan', 'Gluten-free', 'Dairy-free', 'Low-carb', 'High-protein', 'Mediterranean', 'Paleo'} }">
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="checkbox" name="dietaryPreferences"
+                                       th:value="${pref}"
+                                       th:checked="${config.dietaryPreferences != null && config.dietaryPreferences.contains(pref)}"
+                                       class="w-4 h-4 accent-primary-600">
+                                <span class="text-sm text-gray-700" th:text="${pref}">Pref</span>
+                            </label>
+                        </th:block>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Allergies & Restrictions</label>
+                    <input type="text" name="allergies"
+                           th:value="${config.allergies != null ? config.allergies.toString().replace('[','').replace(']','') : ''}"
+                           placeholder="e.g. nuts, shellfish, eggs..."
+                           class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+                </div>
+            </div>
+
+            <!-- Meal Types -->
+            <div class="card p-6">
+                <h2 class="text-lg font-bold text-gray-800 mb-5 flex items-center space-x-2">
+                    <span>🍽️</span><span>Meal Types to Plan</span>
+                </h2>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <label class="flex items-center p-4 border-2 rounded-xl cursor-pointer hover:border-primary-300 transition-colors"
+                           th:classappend="${config.includeBreakfast ? 'border-primary-500 bg-primary-50' : 'border-gray-200'}">
+                        <input type="checkbox" name="includeBreakfast"
+                               th:checked="${config.includeBreakfast}"
+                               class="w-5 h-5 accent-primary-600 mr-3">
+                        <div>
+                            <div class="text-xl mb-1">☀️</div>
+                            <span class="font-medium text-gray-800">Breakfast</span>
+                        </div>
+                    </label>
+                    <label class="flex items-center p-4 border-2 rounded-xl cursor-pointer hover:border-primary-300 transition-colors"
+                           th:classappend="${config.includeLunch ? 'border-primary-500 bg-primary-50' : 'border-gray-200'}">
+                        <input type="checkbox" name="includeLunch"
+                               th:checked="${config.includeLunch}"
+                               class="w-5 h-5 accent-primary-600 mr-3">
+                        <div>
+                            <div class="text-xl mb-1">🌤️</div>
+                            <span class="font-medium text-gray-800">Lunch</span>
+                        </div>
+                    </label>
+                    <label class="flex items-center p-4 border-2 rounded-xl cursor-pointer hover:border-primary-300 transition-colors"
+                           th:classappend="${config.includeDinner ? 'border-primary-500 bg-primary-50' : 'border-gray-200'}">
+                        <input type="checkbox" name="includeDinner"
+                               th:checked="${config.includeDinner}"
+                               class="w-5 h-5 accent-primary-600 mr-3">
+                        <div>
+                            <div class="text-xl mb-1">🌙</div>
+                            <span class="font-medium text-gray-800">Dinner</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Budget & Offers -->
+            <div class="card p-6">
+                <h2 class="text-lg font-bold text-gray-800 mb-5 flex items-center space-x-2">
+                    <span>💰</span><span>Budget &amp; Offers</span>
+                </h2>
+                <div class="space-y-4">
+                    <label class="flex items-center justify-between p-4 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50">
+                        <div>
+                            <p class="font-medium text-gray-800">Prefer budget-friendly meals</p>
+                            <p class="text-sm text-gray-500">AI will prioritize cost-effective recipes</p>
+                        </div>
+                        <input type="checkbox" name="preferBudgetFriendly"
+                               th:checked="${config.preferBudgetFriendly}"
+                               class="w-5 h-5 accent-primary-600">
+                    </label>
+                    <label class="flex items-center justify-between p-4 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50">
+                        <div>
+                            <p class="font-medium text-gray-800">Use store offers in menu planning</p>
+                            <p class="text-sm text-gray-500">AI will prioritize ingredients currently on sale</p>
+                        </div>
+                        <input type="checkbox" name="useStoreOffers"
+                               th:checked="${config.useStoreOffers}"
+                               class="w-5 h-5 accent-primary-600">
+                    </label>
+                </div>
+            </div>
+
+            <!-- Your Local Stores (specific store search with HTMX autocomplete) -->
+            <div class="card p-6">
+                <h2 class="text-lg font-bold text-gray-800 mb-2 flex items-center space-x-2">
+                    <span>🏪</span><span>Your Local Stores</span>
+                </h2>
+                <p class="text-sm text-gray-500 mb-5">
+                    Search for your specific store by name (e.g. "ICA Kvantum Caroli", "Willys Lund"). The list includes 60+ named Swedish stores seeded from public store directories. If your store isn't listed, type the name and click <strong>Add store</strong> to add it yourself.
+                </p>
+
+                <!-- Search input with HTMX autocomplete -->
+                <div class="relative">
+                    <input type="text" id="storeSearch" name="q"
+                           autocomplete="off"
+                           placeholder="Type a store name, e.g. ICA Kvantum Caroli..."
+                           hx-get="/stores/search"
+                           hx-trigger="keyup changed delay:300ms"
+                           hx-target="#store-suggestions"
+                           class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none pr-10">
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">🔍</span>
+                    <!-- Suggestions dropdown -->
+                    <div id="store-suggestions"
+                         class="absolute z-20 w-full bg-white border border-gray-200 rounded-xl shadow-lg mt-1 max-h-64 overflow-y-auto hidden">
+                    </div>
+                </div>
+
+                <!-- Selected stores list -->
+                <div class="mt-4 space-y-2" id="selected-stores-list">
+                    <th:block th:each="store : ${selectedStores}">
+                        <div class="flex items-center justify-between p-3 bg-primary-50 border border-primary-200 rounded-xl">
+                            <div>
+                                <span class="font-medium text-gray-800" th:text="${store.name}">Store</span>
+                                <span class="text-xs text-gray-500 ml-2 uppercase" th:text="${store.chain}">chain</span>
+                            </div>
+                            <button type="button" onclick="removeStore(this)"
+                                    class="text-red-400 hover:text-red-600 font-bold text-lg leading-none ml-3">✕</button>
+                            <input type="hidden" name="selectedStores"
+                                   th:value="${store.id + '|' + store.name + '|' + store.chain}"
+                                   th:attr="data-id=${store.id}">
+                        </div>
+                    </th:block>
+                </div>
+                <p id="no-stores-msg" th:if="${selectedStores.isEmpty()}"
+                   class="text-sm text-gray-400 mt-3 italic">No stores selected yet.</p>
+
+                <script>
+                    function addStoreEl(el) {
+                        addStore(el.dataset.storeId, el.dataset.storeName, el.dataset.storeChain);
+                    }
+                    function addCustomStoreEl(btn) {
+                        const chain = document.getElementById('newStoreChain')?.value || 'other';
+                        const name = btn.dataset.storeName;
+                        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+                        const id = 'custom-' + (slug || Date.now().toString(36));
+                        addStore(id, name, chain);
+                    }
+                    function addStore(id, name, chain) {
+                        const list = document.getElementById('selected-stores-list');
+                        if (list.querySelector('input[name="selectedStores"][data-id="' + id + '"]')) return;
+                        const item = document.createElement('div');
+                        item.className = 'flex items-center justify-between p-3 bg-primary-50 border border-primary-200 rounded-xl';
+                        item.innerHTML =
+                            '<div><span class="font-medium text-gray-800">' + name + '</span>'
+                            + '<span class="text-xs text-gray-500 ml-2 uppercase">' + chain + '</span></div>'
+                            + '<button type="button" onclick="removeStore(this)" class="text-red-400 hover:text-red-600 font-bold text-lg leading-none ml-3">✕</button>'
+                            + '<input type="hidden" name="selectedStores" data-id="' + id + '" value="' + id + '|' + name + '|' + chain + '">';
+                        list.appendChild(item);
+                        const msg = document.getElementById('no-stores-msg');
+                        if (msg) msg.style.display = 'none';
+                        document.getElementById('store-suggestions').innerHTML = '';
+                        document.getElementById('store-suggestions').classList.add('hidden');
+                        document.getElementById('storeSearch').value = '';
+                    }
+                    function removeStore(btn) {
+                        btn.closest('div').remove();
+                    }
+                    // Show dropdown when HTMX populates it
+                    document.body.addEventListener('htmx:afterSettle', function(e) {
+                        if (e.detail.target && e.detail.target.id === 'store-suggestions') {
+                            const dropdown = document.getElementById('store-suggestions');
+                            dropdown.classList.toggle('hidden', dropdown.innerHTML.trim() === '');
+                        }
+                    });
+                    // Close dropdown on outside click
+                    document.addEventListener('click', function(e) {
+                        if (!e.target.closest('#storeSearch') && !e.target.closest('#store-suggestions')) {
+                            document.getElementById('store-suggestions').classList.add('hidden');
+                        }
+                    });
+                </script>
+            </div>
+
+            <!-- Additional Instructions -->
+            <div class="card p-6">
+                <h2 class="text-lg font-bold text-gray-800 mb-5 flex items-center space-x-2">
+                    <span>📝</span><span>Additional Instructions for AI</span>
+                </h2>
+                <textarea name="additionalInstructions"
+                          rows="4"
+                          th:text="${config.additionalInstructions}"
+                          placeholder="e.g. I love spicy food, prefer meals that can be prepared in under 30 minutes, include one vegetarian meal per week..."
+                          class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none resize-none"></textarea>
+                <p class="text-xs text-gray-500 mt-2">These instructions will be sent to Gemini AI when generating your menu.</p>
+            </div>
+
+            <!-- Save Button -->
+            <div class="flex justify-end space-x-3">
+                <a href="/dashboard" class="btn-secondary">Cancel</a>
+                <button type="submit" class="btn-primary flex items-center space-x-2">
+                    <span>💾</span>
+                    <span>Save Settings</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</main>
+</body>
+</html>

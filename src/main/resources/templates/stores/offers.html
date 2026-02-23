@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::title}, ~{::main})}"
+      lang="en">
+<head>
+    <title>Store Offers</title>
+</head>
+<body>
+<main th:fragment="content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">Store Offers</h1>
+            <p class="text-gray-500 mt-1">Current deals at your selected stores</p>
+        </div>
+        <a href="/menu/config" class="btn-secondary flex items-center space-x-2">
+            <span>⚙️</span><span>Configure Stores</span>
+        </a>
+    </div>
+
+    <!-- AI-estimated banner -->
+    <div th:if="${!#lists.isEmpty(selectedStores)}"
+         class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-center space-x-2">
+        <span>ℹ️</span>
+        <span>Offers are AI-estimated based on typical weekly promotions for your selected stores and may not reflect live prices. Click <strong>Refresh</strong> to generate the latest estimate.</span>
+    </div>
+
+    <!-- No stores selected -->
+    <div th:if="${#lists.isEmpty(selectedStores)}" class="card p-12 text-center">
+        <div class="text-6xl mb-4">🏪</div>
+        <h2 class="text-xl font-bold text-gray-700 mb-2">No stores selected</h2>
+        <p class="text-gray-500 mb-6">Search for your local store in Menu Settings to see current offers</p>
+        <a href="/menu/config" class="btn-primary inline-flex items-center space-x-2">
+            <span>⚙️</span><span>Go to Settings</span>
+        </a>
+    </div>
+
+    <!-- Store sections -->
+    <div th:if="${!#lists.isEmpty(selectedStores)}" class="space-y-8">
+
+        <!-- Selected stores with per-store refresh buttons -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <div th:each="store : ${selectedStores}"
+                 class="card p-4 flex items-center justify-between">
+                <div>
+                    <p class="font-medium text-gray-800 text-sm" th:text="${store.name}">Store</p>
+                    <p class="text-xs text-gray-400 uppercase" th:text="${store.chain}">chain</p>
+                </div>
+                <button th:attr="hx-post='/stores/' + ${store.id} + '/refresh', hx-indicator='#spin-' + ${store.id}"
+                        hx-disabled-elt="this"
+                        hx-on::after-request="window.location.reload()"
+                        class="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center space-x-1 ml-2 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span th:id="'spin-' + ${store.id}" class="htmx-indicator">⏳</span>
+                    <span>🔄 Refresh</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- No offers state -->
+        <div th:if="${#lists.isEmpty(offers)}" class="card p-8 text-center">
+            <div class="text-5xl mb-4">🏷️</div>
+            <h3 class="text-lg font-bold text-gray-700 mb-2">No offers loaded yet</h3>
+            <p class="text-gray-500 mb-4">Offers are refreshed automatically every Monday.</p>
+            <p class="text-sm text-gray-400">Store offer APIs may require additional configuration.</p>
+        </div>
+
+        <!-- Offers grid -->
+        <div th:if="${!#lists.isEmpty(offers)}">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Current Offers</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div th:each="offer : ${offers}"
+                     class="card p-4 hover:shadow-md transition-shadow">
+                    <div class="flex items-start justify-between mb-2">
+                        <h3 class="font-medium text-gray-800 text-sm" th:text="${offer.productName}">Product</h3>
+                        <span class="ml-2 bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                              th:text="${'-' + #numbers.formatDecimal(offer.discountPercent, 1, 0) + '%'}">-20%</span>
+                    </div>
+                    <p class="text-xs text-gray-500 mb-3" th:text="${offer.storeName}">Store</p>
+                    <div class="flex items-baseline space-x-2">
+                        <span class="text-xl font-bold text-primary-600"
+                              th:text="${#numbers.formatDecimal(offer.salePrice, 1, 2) + ' kr'}">49.90 kr</span>
+                        <span th:if="${offer.originalPrice > 0}"
+                              class="text-sm text-gray-400 line-through"
+                              th:text="${#numbers.formatDecimal(offer.originalPrice, 1, 2) + ' kr'}">69 kr</span>
+                    </div>
+                    <p th:if="${offer.validTo != null}"
+                       class="text-xs text-gray-400 mt-2"
+                       th:text="'Valid until: ' + ${#temporals.format(offer.validTo, 'MMM d')}">Valid until: Jan 7</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>
