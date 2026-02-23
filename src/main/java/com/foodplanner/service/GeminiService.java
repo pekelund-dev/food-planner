@@ -227,6 +227,7 @@ public class GeminiService {
 
     private WeeklyMenu parseMenuResponse(String userId, String response, MenuConfig config) {
         try {
+            log.debug("Raw AI menu response (length={}): {}", response == null ? 0 : response.length(), response);
             String json = stripMarkdownFences(response);
             JsonNode root = objectMapper.readTree(json);
             WeeklyMenu menu = new WeeklyMenu();
@@ -274,6 +275,7 @@ public class GeminiService {
 
     private Recipe parseRecipeResponse(String userId, String mealName, String response) {
         try {
+            log.debug("Raw AI recipe response (length={}): {}", response == null ? 0 : response.length(), response);
             String json = stripMarkdownFences(response);
             JsonNode root = objectMapper.readTree(json);
             Recipe recipe = new Recipe();
@@ -332,6 +334,7 @@ public class GeminiService {
 
     private List<ShoppingList.ShoppingItem> parseShoppingListResponse(String response, List<StoreOffer> offers) {
         try {
+            log.debug("Raw AI shopping list response (length={}): {}", response == null ? 0 : response.length(), response);
             String json = stripMarkdownFences(response);
             JsonNode root = objectMapper.readTree(json);
             List<ShoppingList.ShoppingItem> items = new ArrayList<>();
