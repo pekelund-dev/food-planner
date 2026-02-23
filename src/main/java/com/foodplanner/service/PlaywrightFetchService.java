@@ -22,11 +22,21 @@ public class PlaywrightFetchService {
     /**
      * Maximum characters of page text to return, to stay within AI token limits.
      */
-    private static final int MAX_CONTENT_LENGTH = 40_000;
+    private static final int MAX_CONTENT_LENGTH = 80_000;
+
+    /** Characters to print in the INFO snippet to help diagnose what Playwright fetched. */
+    private static final int CONTENT_SNIPPET_LENGTH = 1000;
+
+    /** Initial pause after first scroll-to-bottom, allowing first batch of lazy tiles to load. */
+    private static final int LAZY_LOAD_INITIAL_WAIT_MS = 2000;
+
+    /** Shorter pause after second scroll, letting any remaining lazy tiles settle. */
+    private static final int LAZY_LOAD_SUBSEQUENT_WAIT_MS = 1000;
 
     /**
      * Navigates to {@code url} with a headless Chromium browser, waits for the page to
-     * finish loading, and returns the visible text body (via {@code innerText("body")}).
+     * finish loading, scrolls to the bottom to trigger lazy-loaded content, and returns
+     * the visible text body (via {@code innerText("body")}).
      * Returns an empty string if the fetch fails for any reason (browser not installed,
      * network error, timeout, etc.) so callers can fall back gracefully.
      */
@@ -45,8 +55,22 @@ public class PlaywrightFetchService {
                 // Proceed with whatever has loaded so far
                 log.debug("Network-idle timeout for {}; continuing with partial content", url);
             }
+            // Scroll to bottom to trigger any lazy-loaded offer tiles, then wait briefly
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight)");
+            page.waitForTimeout(LAZY_LOAD_INITIAL_WAIT_MS);
+            // Scroll to bottom a second time in case more content was loaded after first scroll
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight)");
+            page.waitForTimeout(LAZY_LOAD_SUBSEQUENT_WAIT_MS);
+
             String content = page.innerText("body");
+            int rawLength = content != null ? content.length() : 0;
+            log.info("Playwright fetched {} characters from {}", rawLength, url);
+            if (rawLength > 0) {
+                log.info("Page content snippet (first {} chars): {}",
+                        CONTENT_SNIPPET_LENGTH, content.substring(0, Math.min(CONTENT_SNIPPET_LENGTH, rawLength)));
+            }
             if (content != null && content.length() > MAX_CONTENT_LENGTH) {
+                log.info("Truncating content from {} to {} characters", rawLength, MAX_CONTENT_LENGTH);
                 content = content.substring(0, MAX_CONTENT_LENGTH);
             }
             return content != null ? content : "";

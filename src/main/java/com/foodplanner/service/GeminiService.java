@@ -415,6 +415,9 @@ public class GeminiService {
                 + "\"offerDescription\": \"string\"}]";
         try {
             String response = callAi(prompt);
+            log.info("AI raw response length for '{}': {} chars", storeName,
+                    response != null ? response.length() : 0);
+            log.debug("AI raw response for '{}': {}", storeName, response);
             List<StoreOffer> offers = parseExtractedOffers(stripMarkdownFences(response), storeName, storeId);
             log.info("AI extracted {} offers from page content for store '{}'", offers.size(), storeName);
             return offers;
