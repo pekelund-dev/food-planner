@@ -26,39 +26,128 @@ An AI-powered food planning application built with Spring Boot, Thymeleaf, HTMX,
 
 ### Prerequisites
 
-- Java 17+
+- Java 25+
 - Maven 3.9+
-- A Google Cloud project with:
-  - Firebase Firestore enabled
-  - Google OAuth2 credentials (OAuth 2.0 Client ID)
-  - Gemini API key
+- A Google Cloud project (create one free at https://console.cloud.google.com)
+- The `gcloud` CLI installed (https://cloud.google.com/sdk/docs/install)
 
-### Configuration
+---
 
-Copy the environment variables and configure them:
+### 1. Gemini API Key
 
+The Gemini API key is obtained from **Google AI Studio** (not GCP Console).
+
+**Via browser:**
+1. Go to https://aistudio.google.com/app/apikey
+2. Click **Create API key**
+3. Select your GCP project and copy the key
+
+**Via gcloud CLI** (requires billing-enabled project):
 ```bash
-# Google OAuth2 (from Google Cloud Console → APIs & Services → Credentials)
-export GOOGLE_CLIENT_ID=your-google-client-id
-export GOOGLE_CLIENT_SECRET=your-google-client-secret
-
-# Firebase (from Firebase Console → Project Settings → Service Accounts)
-export FIREBASE_PROJECT_ID=your-firebase-project-id
-export FIREBASE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'
-
-# Gemini AI (from Google AI Studio → Get API Key)
-export GEMINI_API_KEY=your-gemini-api-key
-
-# Optional: Store integrations
-export ICA_ENABLED=true
-export WILLYS_ENABLED=true
-export COOP_ENABLED=true
+# The Gemini API key lives in AI Studio – use the browser above.
+# However you can verify your project is set correctly:
+gcloud config set project YOUR_PROJECT_ID
 ```
+
+Set the environment variable:
+```bash
+export GEMINI_API_KEY=your-key-here
+```
+
+---
+
+### 2. Google OAuth2 Credentials (for Sign-in with Google)
+
+**Via GCP Console:**
+1. Go to https://console.cloud.google.com/apis/credentials
+2. Enable the **OAuth consent screen**: APIs & Services → OAuth consent screen  
+   - Choose **External**, fill in App name, support email, developer email
+3. Back on **Credentials** → **Create Credentials** → **OAuth 2.0 Client ID**
+4. Application type: **Web application**
+5. Under **Authorised redirect URIs** add: `http://localhost:8080/login/oauth2/code/google`
+6. Copy the **Client ID** and **Client Secret**
+
+**Via gcloud CLI:**
+```bash
+# List existing OAuth clients (note: creation is not supported via CLI – use Console)
+gcloud auth application-default login
+gcloud config set project YOUR_PROJECT_ID
+
+# Enable required APIs
+gcloud services enable oauth2.googleapis.com
+gcloud services enable people.googleapis.com
+```
+
+Set the environment variables:
+```bash
+export GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+export GOOGLE_CLIENT_SECRET=your-client-secret
+```
+
+---
+
+### 3. Firebase / Firestore Service Account
+
+**Via Firebase Console (browser):**
+1. Go to https://console.firebase.google.com and open your project  
+   (create one if needed: **Add project** → link to your GCP project)
+2. Enable **Firestore Database**: Build → Firestore Database → Create database  
+   Choose **Native mode** and a region (e.g. `europe-west1`)
+3. Download a Service Account key:  
+   Project Settings (⚙️) → **Service accounts** tab  
+   → **Generate new private key** → save the JSON file
+
+**Via gcloud / Firebase CLI:**
+```bash
+# Install Firebase CLI
+npm install -g firebase-tools
+
+# Login and pick your project
+firebase login
+firebase use YOUR_PROJECT_ID
+
+# Enable Firestore via gcloud
+gcloud services enable firestore.googleapis.com
+
+# Create a service account (replace SA_NAME with a name you choose)
+gcloud iam service-accounts create food-planner-sa \
+    --display-name="Food Planner Service Account"
+
+# Grant Firestore access
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+    --member="serviceAccount:food-planner-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+    --role="roles/datastore.user"
+
+# Download the key as JSON
+gcloud iam service-accounts keys create firebase-sa.json \
+    --iam-account=food-planner-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com
+```
+
+Set the environment variables (choose one method):
+```bash
+# Option A – inline JSON (good for containers/CI)
+export FIREBASE_PROJECT_ID=YOUR_PROJECT_ID
+export FIREBASE_SERVICE_ACCOUNT_JSON=$(cat firebase-sa.json)
+
+# Option B – file path (good for local dev)
+export FIREBASE_PROJECT_ID=YOUR_PROJECT_ID
+export FIREBASE_SERVICE_ACCOUNT_PATH=/path/to/firebase-sa.json
+```
+
+> ⚠️ Never commit `firebase-sa.json` to version control. It is already listed in `.gitignore`.
+
+---
 
 ### Running locally
 
 ```bash
-mvn spring-boot:run
+export GOOGLE_CLIENT_ID=...
+export GOOGLE_CLIENT_SECRET=...
+export FIREBASE_PROJECT_ID=...
+export FIREBASE_SERVICE_ACCOUNT_JSON=$(cat firebase-sa.json)
+export GEMINI_API_KEY=...
+
+JAVA_HOME=/path/to/java25 mvn spring-boot:run
 ```
 
 Open http://localhost:8080 in your browser.
@@ -66,9 +155,10 @@ Open http://localhost:8080 in your browser.
 ### Building
 
 ```bash
-mvn package
+JAVA_HOME=/path/to/java25 mvn package
 java -jar target/food-planner-1.0.0-SNAPSHOT.jar
 ```
+
 
 ## Firebase Firestore Structure
 
