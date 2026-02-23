@@ -1,29 +1,23 @@
 package com.foodplanner.config;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class GeminiConfig {
 
-    @Value("${gemini.api-key:}")
-    private String apiKey;
-
-    @Value("${gemini.model:gemini-1.5-flash}")
-    private String model;
-
-    @Value("${gemini.base-url:https://generativelanguage.googleapis.com/v1beta}")
-    private String baseUrl;
-
-    public String getApiKey() {
-        return apiKey;
-    }
-
-    public String getModel() {
-        return model;
-    }
-
-    public String getBaseUrl() {
-        return baseUrl;
+    /**
+     * Expose a ChatClient bean only when Spring AI's Google GenAI
+     * auto-configuration has provided a ChatClient.Builder (i.e. when
+     * spring.ai.google.genai.api-key is configured).  When the key is absent
+     * the bean is simply not registered and GeminiService falls back to its
+     * built-in sample data.
+     */
+    @Bean
+    @ConditionalOnBean(ChatClient.Builder.class)
+    public ChatClient chatClient(ChatClient.Builder builder) {
+        return builder.build();
     }
 }

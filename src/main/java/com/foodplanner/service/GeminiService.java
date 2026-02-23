@@ -2,15 +2,12 @@ package com.foodplanner.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.foodplanner.config.GeminiConfig;
 import com.foodplanner.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.*;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -23,90 +20,74 @@ public class GeminiService {
 
     private static final Logger log = LoggerFactory.getLogger(GeminiService.class);
 
-    private final GeminiConfig geminiConfig;
+    private final ChatClient chatClient;
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
-    private final RestTemplate restTemplate = new RestTemplate();
 
     private static final String[] DAYS = {"MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"};
 
-    public GeminiService(GeminiConfig geminiConfig) {
-        this.geminiConfig = geminiConfig;
+    public GeminiService(@Autowired(required = false) ChatClient chatClient) {
+        this.chatClient = chatClient;
+    }
+
+    private boolean isConfigured() {
+        return chatClient != null;
     }
 
     /**
-     * Generate a weekly menu using Gemini AI.
+     * Generate a weekly menu using Gemini AI via Spring AI.
      */
     public WeeklyMenu generateWeeklyMenu(String userId, MenuConfig config, List<StoreOffer> currentOffers) {
-        if (geminiConfig.getApiKey() == null || geminiConfig.getApiKey().isBlank()) {
-            log.warn("Gemini API key not configured, returning sample menu");
+        if (!isConfigured()) {
+            log.warn("Spring AI ChatClient not configured – returning sample menu");
             return buildSampleMenu(userId, config);
         }
 
         String prompt = buildMenuPrompt(config, currentOffers);
-        String response = callGemini(prompt);
+        String response = callAi(prompt);
         return parseMenuResponse(userId, response, config);
     }
 
     /**
-     * Generate a recipe for a given meal using Gemini AI.
+     * Generate a recipe for a given meal using Gemini AI via Spring AI.
      */
     public Recipe generateRecipe(String userId, String mealName, MenuConfig config, List<StoreOffer> currentOffers) {
-        if (geminiConfig.getApiKey() == null || geminiConfig.getApiKey().isBlank()) {
-            log.warn("Gemini API key not configured, returning sample recipe");
+        if (!isConfigured()) {
+            log.warn("Spring AI ChatClient not configured – returning sample recipe");
             return buildSampleRecipe(userId, mealName);
         }
 
         String prompt = buildRecipePrompt(mealName, config, currentOffers);
-        String response = callGemini(prompt);
+        String response = callAi(prompt);
         return parseRecipeResponse(userId, mealName, response);
     }
 
     /**
-     * Generate a shopping list for a given weekly menu.
+     * Generate shopping list items for a given weekly menu using Gemini AI via Spring AI.
      */
     public List<ShoppingList.ShoppingItem> generateShoppingItems(WeeklyMenu menu,
                                                                    Map<String, Recipe> recipes,
                                                                    List<StoreOffer> offers) {
-        if (geminiConfig.getApiKey() == null || geminiConfig.getApiKey().isBlank()) {
+        if (!isConfigured()) {
             return buildSampleShoppingItems(recipes, offers);
         }
 
         String prompt = buildShoppingListPrompt(menu, recipes, offers);
-        String response = callGemini(prompt);
+        String response = callAi(prompt);
         return parseShoppingListResponse(response, offers);
     }
 
-    private String callGemini(String prompt) {
-        String url = geminiConfig.getBaseUrl() + "/models/" + geminiConfig.getModel()
-                + ":generateContent?key=" + geminiConfig.getApiKey();
-
-        ObjectNode requestBody = objectMapper.createObjectNode();
-        ArrayNode contents = requestBody.putArray("contents");
-        ObjectNode content = contents.addObject();
-        ArrayNode parts = content.putArray("parts");
-        parts.addObject().put("text", prompt);
-
-        ObjectNode generationConfig = requestBody.putObject("generationConfig");
-        generationConfig.put("temperature", 0.7);
-        generationConfig.put("maxOutputTokens", 4096);
-        generationConfig.put("responseMimeType", "application/json");
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<String> entity;
+    /**
+     * Invoke the Spring AI ChatClient and return the raw text response.
+     */
+    private String callAi(String prompt) {
         try {
-            entity = new HttpEntity<>(objectMapper.writeValueAsString(requestBody), headers);
+            return chatClient.prompt()
+                    .user(prompt)
+                    .call()
+                    .content();
         } catch (Exception e) {
-            throw new RuntimeException("Failed to build Gemini request", e);
-        }
-
-        try {
-            ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
-            JsonNode root = objectMapper.readTree(response.getBody());
-            return root.path("candidates").path(0).path("content").path("parts").path(0).path("text").asText();
-        } catch (Exception e) {
-            log.error("Error calling Gemini API", e);
-            throw new RuntimeException("Failed to call Gemini API: " + e.getMessage(), e);
+            log.error("Error calling AI model via Spring AI", e);
+            throw new RuntimeException("AI call failed: " + e.getMessage(), e);
         }
     }
 
@@ -153,6 +134,7 @@ public class GeminiService {
         sb.append("    \"SUNDAY\": {\"dinner\": [{\"mealName\": \"string\", \"description\": \"string\", \"estimatedCost\": number}]}\n");
         sb.append("  }\n");
         sb.append("}\n");
+        sb.append("Respond with valid JSON only, no markdown fences.");
 
         return sb.toString();
     }
@@ -186,6 +168,7 @@ public class GeminiService {
         sb.append("  \"instructions\": [\"step 1\", \"step 2\"],\n");
         sb.append("  \"tags\": [\"tag1\", \"tag2\"]\n");
         sb.append("}\n");
+        sb.append("Respond with valid JSON only, no markdown fences.");
 
         return sb.toString();
     }
@@ -226,7 +209,7 @@ public class GeminiService {
         sb.append("\nConsolidate all ingredients into a single shopping list. ");
         sb.append("Combine duplicates, categorize by section (Produce, Dairy, Meat, Pantry, etc.), ");
         sb.append("and mark items that are on sale.\n\n");
-        sb.append("Return JSON array:\n");
+        sb.append("Return JSON array only, no markdown fences:\n");
         sb.append("[{\"name\": \"string\", \"amount\": number, \"unit\": \"string\", \"category\": \"string\", \"onSale\": boolean, \"storeName\": \"string or null\"}]\n");
 
         return sb.toString();
@@ -234,7 +217,8 @@ public class GeminiService {
 
     private WeeklyMenu parseMenuResponse(String userId, String response, MenuConfig config) {
         try {
-            JsonNode root = objectMapper.readTree(response);
+            String json = stripMarkdownFences(response);
+            JsonNode root = objectMapper.readTree(json);
             WeeklyMenu menu = new WeeklyMenu();
             menu.setUserId(userId);
             menu.setAiGenerated(true);
@@ -242,8 +226,7 @@ public class GeminiService {
             LocalDate nextMonday = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY));
             menu.setWeekStart(nextMonday);
             menu.setWeekEnd(nextMonday.plusDays(6));
-            String weekId = MenuService.formatWeekId(nextMonday);
-            menu.setWeekId(weekId);
+            menu.setWeekId(MenuService.formatWeekId(nextMonday));
 
             Map<String, WeeklyMenu.DayMenu> days = new LinkedHashMap<>();
             JsonNode daysNode = root.path("days");
@@ -260,7 +243,7 @@ public class GeminiService {
             menu.setDays(days);
             return menu;
         } catch (Exception e) {
-            log.error("Failed to parse Gemini menu response", e);
+            log.error("Failed to parse AI menu response", e);
             return buildSampleMenu(userId, config);
         }
     }
@@ -281,7 +264,8 @@ public class GeminiService {
 
     private Recipe parseRecipeResponse(String userId, String mealName, String response) {
         try {
-            JsonNode root = objectMapper.readTree(response);
+            String json = stripMarkdownFences(response);
+            JsonNode root = objectMapper.readTree(json);
             Recipe recipe = new Recipe();
             recipe.setUserId(userId);
             recipe.setName(root.path("name").asText(mealName));
@@ -331,14 +315,15 @@ public class GeminiService {
 
             return recipe;
         } catch (Exception e) {
-            log.error("Failed to parse Gemini recipe response", e);
+            log.error("Failed to parse AI recipe response", e);
             return buildSampleRecipe(userId, mealName);
         }
     }
 
     private List<ShoppingList.ShoppingItem> parseShoppingListResponse(String response, List<StoreOffer> offers) {
         try {
-            JsonNode root = objectMapper.readTree(response);
+            String json = stripMarkdownFences(response);
+            JsonNode root = objectMapper.readTree(json);
             List<ShoppingList.ShoppingItem> items = new ArrayList<>();
             if (root.isArray()) {
                 for (JsonNode itemNode : root) {
@@ -358,9 +343,23 @@ public class GeminiService {
             }
             return items;
         } catch (Exception e) {
-            log.error("Failed to parse Gemini shopping list response", e);
+            log.error("Failed to parse AI shopping list response", e);
             return buildSampleShoppingItems(Map.of(), offers);
         }
+    }
+
+    /** Strip optional markdown code fences that some models still add despite instructions. */
+    private String stripMarkdownFences(String text) {
+        if (text == null) return "{}";
+        String trimmed = text.strip();
+        if (trimmed.startsWith("```")) {
+            int firstNewline = trimmed.indexOf('\n');
+            int lastFence = trimmed.lastIndexOf("```");
+            if (firstNewline > 0 && lastFence > firstNewline) {
+                return trimmed.substring(firstNewline + 1, lastFence).strip();
+            }
+        }
+        return trimmed;
     }
 
     // ---- Fallback sample data ----

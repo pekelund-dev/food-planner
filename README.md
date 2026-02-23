@@ -15,11 +15,12 @@ An AI-powered food planning application built with Spring Boot, Thymeleaf, HTMX,
 
 ## Tech Stack
 
-- **Backend**: Spring Boot 3.4, Spring Security OAuth2
+- **Backend**: Spring Boot 4.0.2, Spring Security OAuth2
+- **AI**: Spring AI 2.0.0-M2 with Google Gemini (GenAI) integration
 - **Frontend**: Thymeleaf, HTMX, Tailwind CSS
 - **Database**: Firebase Firestore
-- **AI**: Google Gemini API
 - **Auth**: Google OAuth2
+- **Java**: 25
 
 ## Setup
 
