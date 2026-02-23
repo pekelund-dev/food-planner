@@ -1,6 +1,7 @@
 package com.foodplanner.service;
 
 import com.microsoft.playwright.Browser;
+import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
@@ -8,6 +9,8 @@ import com.microsoft.playwright.options.LoadState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 /**
  * Fetches the rendered text content of a URL using a Playwright headless Chromium browser.
@@ -37,6 +40,14 @@ public class PlaywrightFetchService {
     private static final int MAX_SCROLL_ITERATIONS = 20;
 
     /**
+     * Realistic Chrome on Windows user-agent. Avoids bot-detection that keys on
+     * the default "HeadlessChrome" string in the default Playwright UA.
+     */
+    private static final String USER_AGENT =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            + "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+    /**
      * Navigates to {@code url} with a headless Chromium browser, waits for initial load,
      * then repeatedly scrolls to the bottom until the page height stops growing (all
      * lazy-loaded offer tiles are rendered), and returns the visible text body.
@@ -46,8 +57,22 @@ public class PlaywrightFetchService {
         log.info("Fetching rendered content from {}", url);
         try (Playwright playwright = Playwright.create();
              Browser browser = playwright.chromium().launch(
-                     new BrowserType.LaunchOptions().setHeadless(true))) {
-            Page page = browser.newPage();
+                     new BrowserType.LaunchOptions()
+                             .setHeadless(true)
+                             // Disable the automation-control flag that sites use to detect headless browsers
+                             .setArgs(List.of("--disable-blink-features=AutomationControlled")))) {
+
+            BrowserContext context = browser.newContext(
+                    new Browser.NewContextOptions()
+                            .setUserAgent(USER_AGENT)
+                            .setViewportSize(1920, 1080));
+
+            // Remove navigator.webdriver so pages cannot detect headless mode.
+            // IMPORTANT: this script is hardcoded and must never be constructed from
+            // user-supplied input to avoid script injection.
+            context.addInitScript("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})");
+
+            Page page = context.newPage();
             page.navigate(url, new Page.NavigateOptions().setTimeout(30_000));
             // Wait until network is idle so the initial JS render completes
             try {
