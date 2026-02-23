@@ -14,6 +14,7 @@ public class StoreOffer {
     private double salePrice;
     private double discountPercent;
     private String unit;
+    private String offerDescription; // raw deal text, e.g. "2 för 25 kr" or "Köp 3 betala för 2"
     private LocalDate validFrom;
     private LocalDate validTo;
     private String imageUrl;
@@ -47,6 +48,9 @@ public class StoreOffer {
 
     public String getUnit() { return unit; }
     public void setUnit(String unit) { this.unit = unit; }
+
+    public String getOfferDescription() { return offerDescription; }
+    public void setOfferDescription(String offerDescription) { this.offerDescription = offerDescription; }
 
     public LocalDate getValidFrom() { return validFrom; }
     public void setValidFrom(LocalDate validFrom) { this.validFrom = validFrom; }

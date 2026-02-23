@@ -386,19 +386,33 @@ public class GeminiService {
         if (!isConfigured()) return List.of();
         // Strip control characters from the store name to prevent prompt injection
         String safeName = storeName == null ? "" : storeName.replaceAll("[\\p{Cntrl}]", " ").trim();
-        String prompt = "You are extracting grocery store offer data from a web page.\n"
+        String prompt = "You are extracting grocery store offer data from a Swedish store's offers page.\n"
                 + "Store name: \"" + safeName + "\"\n\n"
-                + "Below is the visible text content of the store's current offers page:\n"
+                + "Below is the full visible text of the store's current offers page:\n"
                 + "--- BEGIN CONTENT ---\n" + pageContent + "\n--- END CONTENT ---\n\n"
-                + "Extract every product offer you can find. For each offer provide:\n"
-                + "- productName: the product name (string)\n"
-                + "- salePrice: the discounted/sale price in SEK (number)\n"
-                + "- originalPrice: the original/regular price in SEK (number, 0 if not shown)\n"
-                + "- productCategory: category such as Meat, Fish, Dairy, Produce, Pantry, Beverages, Snacks\n"
-                + "- unit: unit of measure shown (e.g. kg, st, förp, l)\n\n"
-                + "Return a JSON array only, no markdown fences:\n"
+                + "IMPORTANT RULES:\n"
+                + "1. Extract EVERY single product offer present in the content — do not stop early or truncate the list.\n"
+                + "   Swedish store pages typically contain 30–80 weekly offers; extract them all.\n"
+                + "2. Always include the BRAND name in productName (e.g. \"Arla Mellanmjölk 1,5%\", not just \"Mjölk\").\n"
+                + "3. For multi-buy deals (e.g. \"2 för 25 kr\", \"3 för 2\", \"Köp 2 betala för 1\"):\n"
+                + "   - Set salePrice to the effective per-unit price (total deal price ÷ required quantity).\n"
+                + "   - Set originalPrice to the normal single-unit price (if shown).\n"
+                + "   - Set offerDescription to the verbatim deal text from the page (e.g. \"2 för 25 kr\").\n"
+                + "   - Calculate discountPercent = ((originalPrice - salePrice) / originalPrice) * 100.\n"
+                + "4. For simple price-cut offers, leave offerDescription as an empty string.\n"
+                + "5. productCategory must be one of: Meat, Fish, Dairy, Produce, Pantry, Beverages, Snacks, Bakery, Frozen, Cleaning, Other.\n\n"
+                + "For each offer return these fields:\n"
+                + "- productName: brand + product name (string)\n"
+                + "- salePrice: effective per-unit sale price in SEK (number)\n"
+                + "- originalPrice: normal full price per unit in SEK (number, 0 if not shown)\n"
+                + "- discountPercent: pre-calculated discount percentage (number, 0 if unknown)\n"
+                + "- productCategory: one of the categories above (string)\n"
+                + "- unit: unit of measure (e.g. kg, st, förp, l)\n"
+                + "- offerDescription: verbatim multi-buy deal text, or empty string\n\n"
+                + "Return a JSON array only, no markdown fences, no commentary:\n"
                 + "[{\"productName\": \"string\", \"salePrice\": number, \"originalPrice\": number, "
-                + "\"productCategory\": \"string\", \"unit\": \"string\"}]";
+                + "\"discountPercent\": number, \"productCategory\": \"string\", \"unit\": \"string\", "
+                + "\"offerDescription\": \"string\"}]";
         try {
             String response = callAi(prompt);
             List<StoreOffer> offers = parseExtractedOffers(stripMarkdownFences(response), storeName, storeId);
@@ -451,10 +465,17 @@ public class GeminiService {
                 offer.setOriginalPrice(node.path("originalPrice").asDouble(0));
                 offer.setProductCategory(node.path("productCategory").asText("Other"));
                 offer.setUnit(node.path("unit").asText(""));
+                offer.setOfferDescription(node.path("offerDescription").asText(""));
                 offer.setFetchedAt(Instant.now());
                 offer.setValidFrom(LocalDate.now());
                 offer.setValidTo(LocalDate.now().plusDays(7));
-                if (offer.getOriginalPrice() > 0 && offer.getSalePrice() > 0
+                // Prefer AI-provided discountPercent: the AI accounts for deal structure
+                // (e.g., for "3 for 2" there's no meaningful originalPrice/salePrice pair),
+                // whereas the simple formula below only works for straightforward price cuts.
+                double aiDiscount = node.path("discountPercent").asDouble(0);
+                if (aiDiscount > 0) {
+                    offer.setDiscountPercent(aiDiscount);
+                } else if (offer.getOriginalPrice() > 0 && offer.getSalePrice() > 0
                         && offer.getOriginalPrice() > offer.getSalePrice()) {
                     double discount = ((offer.getOriginalPrice() - offer.getSalePrice())
                             / offer.getOriginalPrice()) * 100;
