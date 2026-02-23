@@ -1,5 +1,6 @@
 package com.foodplanner.controller;
 
+import com.foodplanner.model.Store;
 import com.foodplanner.model.StoreOffer;
 import com.foodplanner.service.FirebaseService;
 import com.foodplanner.service.StoreOfferService;
@@ -10,9 +11,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/stores")
@@ -30,18 +30,32 @@ public class StoreController {
     public String storeOffers(@AuthenticationPrincipal OAuth2User principal, Model model) {
         String userId = principal.getAttribute("sub");
         var user = firebaseService.getUser(userId);
-        List<String> selectedStores = user != null && user.getSelectedStoreIds() != null
-                ? user.getSelectedStoreIds() : List.of();
+        List<Store> selectedStores = user != null && user.getSelectedStores() != null
+                ? user.getSelectedStores() : List.of();
+
+        // Derive the unique chain IDs for offer fetching
+        Set<String> chainIds = selectedStores.stream()
+                .map(Store::getChain)
+                .filter(c -> c != null && !c.isBlank())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
 
         List<StoreOffer> allOffers = new ArrayList<>();
-        for (String storeId : selectedStores) {
-            allOffers.addAll(storeOfferService.getActiveOffers(storeId));
+        for (String chainId : chainIds) {
+            allOffers.addAll(storeOfferService.getActiveOffers(chainId));
         }
 
         model.addAttribute("offers", allOffers);
         model.addAttribute("selectedStores", selectedStores);
+        model.addAttribute("chainIds", chainIds);
         model.addAttribute("availableStores", storeOfferService.getAvailableStores());
         return "stores/offers";
+    }
+
+    /** HTMX endpoint: returns store-name autocomplete suggestions as an HTML fragment. */
+    @GetMapping("/search")
+    public String searchStores(@RequestParam(defaultValue = "") String q, Model model) {
+        model.addAttribute("results", storeOfferService.searchStores(q));
+        return "fragments/store-suggestions :: results";
     }
 
     @PostMapping("/{storeId}/refresh")
@@ -52,3 +66,4 @@ public class StoreController {
         return ResponseEntity.ok(Map.of("storeId", storeId, "count", offers.size()));
     }
 }
+

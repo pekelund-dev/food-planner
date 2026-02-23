@@ -38,7 +38,7 @@ public class GeminiService {
      */
     public WeeklyMenu generateWeeklyMenu(String userId, MenuConfig config, List<StoreOffer> currentOffers) {
         if (!isConfigured()) {
-            log.warn("Spring AI ChatClient not configured – returning sample menu");
+            log.warn("Gemini AI not configured – set GEMINI_API_KEY env var (get key at https://aistudio.google.com/app/apikey) – returning sample menu");
             return buildSampleMenu(userId, config);
         }
 
@@ -52,7 +52,7 @@ public class GeminiService {
      */
     public Recipe generateRecipe(String userId, String mealName, MenuConfig config, List<StoreOffer> currentOffers) {
         if (!isConfigured()) {
-            log.warn("Spring AI ChatClient not configured – returning sample recipe");
+            log.warn("Gemini AI not configured – set GEMINI_API_KEY env var (get key at https://aistudio.google.com/app/apikey) – returning sample recipe");
             return buildSampleRecipe(userId, mealName);
         }
 

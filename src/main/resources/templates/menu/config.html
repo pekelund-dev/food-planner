@@ -127,29 +127,87 @@
                 </div>
             </div>
 
-            <!-- Select Stores -->
+            <!-- Your Local Stores (specific store search with HTMX autocomplete) -->
             <div class="card p-6">
                 <h2 class="text-lg font-bold text-gray-800 mb-2 flex items-center space-x-2">
-                    <span>🏪</span><span>Select Your Stores</span>
+                    <span>🏪</span><span>Your Local Stores</span>
                 </h2>
-                <p class="text-sm text-gray-500 mb-5">Select one or more local stores. Offers from all selected stores will be fetched and used when generating your menu.</p>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <label th:each="entry : ${availableStores}"
-                           class="flex items-start space-x-3 p-4 border-2 rounded-xl cursor-pointer hover:border-primary-300 transition-colors"
-                           th:classappend="${selectedStoreIds.contains(entry.key) ? 'border-primary-500 bg-primary-50' : 'border-gray-200'}">
-                        <input type="checkbox" name="selectedStoreIds"
-                               th:value="${entry.key}"
-                               th:checked="${selectedStoreIds.contains(entry.key)}"
-                               class="w-4 h-4 accent-primary-600 mt-1 flex-shrink-0">
-                        <div>
-                            <div class="flex items-center space-x-1">
-                                <span class="text-xl" th:text="${entry.value.icon}">🛒</span>
-                                <span class="font-medium text-gray-800 ml-1" th:text="${entry.value.name}">Store</span>
-                            </div>
-                            <p class="text-xs text-gray-500 mt-0.5" th:text="${entry.value.description}">Store description</p>
-                        </div>
-                    </label>
+                <p class="text-sm text-gray-500 mb-5">
+                    Search for your specific store by name (e.g. "ICA Kvantum Caroli"). You can add multiple stores.
+                </p>
+
+                <!-- Search input with HTMX autocomplete -->
+                <div class="relative">
+                    <input type="text" id="storeSearch" name="q"
+                           autocomplete="off"
+                           placeholder="Type a store name, e.g. ICA Kvantum Caroli..."
+                           hx-get="/stores/search"
+                           hx-trigger="keyup changed delay:300ms"
+                           hx-target="#store-suggestions"
+                           class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none pr-10">
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">🔍</span>
+                    <!-- Suggestions dropdown -->
+                    <div id="store-suggestions"
+                         class="absolute z-20 w-full bg-white border border-gray-200 rounded-xl shadow-lg mt-1 max-h-64 overflow-y-auto hidden">
+                    </div>
                 </div>
+
+                <!-- Selected stores list -->
+                <div class="mt-4 space-y-2" id="selected-stores-list">
+                    <th:block th:each="store : ${selectedStores}">
+                        <div class="flex items-center justify-between p-3 bg-primary-50 border border-primary-200 rounded-xl">
+                            <div>
+                                <span class="font-medium text-gray-800" th:text="${store.name}">Store</span>
+                                <span class="text-xs text-gray-500 ml-2 uppercase" th:text="${store.chain}">chain</span>
+                            </div>
+                            <button type="button" onclick="removeStore(this)"
+                                    class="text-red-400 hover:text-red-600 font-bold text-lg leading-none ml-3">✕</button>
+                            <input type="hidden" name="selectedStores"
+                                   th:value="${store.id + '|' + store.name + '|' + store.chain}">
+                        </div>
+                    </th:block>
+                </div>
+                <p id="no-stores-msg" th:if="${selectedStores.isEmpty()}"
+                   class="text-sm text-gray-400 mt-3 italic">No stores selected yet.</p>
+
+                <script>
+                    function addStoreEl(el) {
+                        addStore(el.dataset.storeId, el.dataset.storeName, el.dataset.storeChain);
+                    }
+                    function addStore(id, name, chain) {
+                        const list = document.getElementById('selected-stores-list');
+                        if (list.querySelector('input[name="selectedStores"][data-id="' + id + '"]')) return;
+                        const item = document.createElement('div');
+                        item.className = 'flex items-center justify-between p-3 bg-primary-50 border border-primary-200 rounded-xl';
+                        item.innerHTML =
+                            '<div><span class="font-medium text-gray-800">' + name + '</span>'
+                            + '<span class="text-xs text-gray-500 ml-2 uppercase">' + chain + '</span></div>'
+                            + '<button type="button" onclick="removeStore(this)" class="text-red-400 hover:text-red-600 font-bold text-lg leading-none ml-3">✕</button>'
+                            + '<input type="hidden" name="selectedStores" data-id="' + id + '" value="' + id + '|' + name + '|' + chain + '">';
+                        list.appendChild(item);
+                        const msg = document.getElementById('no-stores-msg');
+                        if (msg) msg.style.display = 'none';
+                        document.getElementById('store-suggestions').innerHTML = '';
+                        document.getElementById('store-suggestions').classList.add('hidden');
+                        document.getElementById('storeSearch').value = '';
+                    }
+                    function removeStore(btn) {
+                        btn.closest('div').remove();
+                    }
+                    // Show dropdown when HTMX populates it
+                    document.body.addEventListener('htmx:afterSettle', function(e) {
+                        if (e.detail.target && e.detail.target.id === 'store-suggestions') {
+                            const dropdown = document.getElementById('store-suggestions');
+                            dropdown.classList.toggle('hidden', dropdown.innerHTML.trim() === '');
+                        }
+                    });
+                    // Close dropdown on outside click
+                    document.addEventListener('click', function(e) {
+                        if (!e.target.closest('#storeSearch') && !e.target.closest('#store-suggestions')) {
+                            document.getElementById('store-suggestions').classList.add('hidden');
+                        }
+                    });
+                </script>
             </div>
 
             <!-- Additional Instructions -->

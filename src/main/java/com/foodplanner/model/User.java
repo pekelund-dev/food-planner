@@ -11,6 +11,7 @@ public class User {
     private String pictureUrl;
     private MenuConfig menuConfig;
     private List<String> selectedStoreIds;
+    private List<Store> selectedStores;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -33,6 +34,9 @@ public class User {
 
     public List<String> getSelectedStoreIds() { return selectedStoreIds; }
     public void setSelectedStoreIds(List<String> selectedStoreIds) { this.selectedStoreIds = selectedStoreIds; }
+
+    public List<Store> getSelectedStores() { return selectedStores; }
+    public void setSelectedStores(List<Store> selectedStores) { this.selectedStores = selectedStores; }
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -68,20 +69,29 @@ public class MenuController {
                 ? user.getMenuConfig() : new MenuConfig();
         model.addAttribute("config", config);
         model.addAttribute("availableStores", storeOfferService.getAvailableStores());
-        model.addAttribute("selectedStoreIds",
-                user != null && user.getSelectedStoreIds() != null ? user.getSelectedStoreIds() : List.of());
+        List<Store> selectedStores = user != null && user.getSelectedStores() != null
+                ? user.getSelectedStores() : List.of();
+        model.addAttribute("selectedStores", selectedStores);
         return "menu/config";
     }
 
     @PostMapping("/config")
     public String saveMenuConfig(@AuthenticationPrincipal OAuth2User principal,
                                   @ModelAttribute MenuConfig config,
-                                  @RequestParam(required = false) List<String> selectedStoreIds) {
+                                  @RequestParam(required = false) List<String> selectedStores) {
         String userId = principal.getAttribute("sub");
         firebaseService.saveMenuConfig(userId, config);
-        if (selectedStoreIds != null) {
-            firebaseService.saveSelectedStores(userId, selectedStoreIds);
+        List<Store> stores = new ArrayList<>();
+        if (selectedStores != null) {
+            for (String entry : selectedStores) {
+                // format: "id|name|chain"
+                String[] parts = entry.split("\\|", 3);
+                if (parts.length == 3) {
+                    stores.add(new Store(parts[0], parts[1], parts[2]));
+                }
+            }
         }
+        firebaseService.saveSelectedStores(userId, stores);
         return "redirect:/menu/config?saved=true";
     }
 

@@ -87,15 +87,59 @@ public class FirebaseService {
         }
     }
 
-    public void saveSelectedStores(String userId, List<String> storeIds) {
+    public void saveSelectedStores(String userId, List<Store> stores) {
         try {
+            List<Map<String, Object>> storeMaps = new ArrayList<>();
+            for (Store store : stores) {
+                storeMaps.add(objectMapper.convertValue(store, new TypeReference<Map<String, Object>>() {}));
+            }
             getFirestore().collection("users").document(userId)
-                    .update("selectedStoreIds", storeIds)
+                    .update("selectedStores", storeMaps)
                     .get();
         } catch (InterruptedException | ExecutionException e) {
             log.error("Error saving stores for user {}", userId, e);
             Thread.currentThread().interrupt();
             throw new RuntimeException("Failed to save stores", e);
+        }
+    }
+
+    /** Persist a custom store to the global "stores" collection for autocomplete. */
+    public void saveStore(Store store) {
+        try {
+            if (store.getId() == null || store.getId().isBlank()) {
+                DocumentReference doc = getFirestore().collection("stores").document();
+                store.setId(doc.getId());
+                doc.set(objectMapper.convertValue(store, new TypeReference<Map<String, Object>>() {})).get();
+            } else {
+                getFirestore().collection("stores").document(store.getId())
+                        .set(objectMapper.convertValue(store, new TypeReference<Map<String, Object>>() {})).get();
+            }
+        } catch (InterruptedException | ExecutionException e) {
+            log.warn("Failed to save store {}: {}", store.getName(), e.getMessage());
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /** Search the global "stores" collection for custom/user-added stores matching the query. */
+    public List<Store> searchCustomStores(String query) {
+        try {
+            QuerySnapshot snap = getFirestore().collection("stores").limit(100).get().get();
+            String q = query.toLowerCase();
+            List<Store> results = new ArrayList<>();
+            for (DocumentSnapshot doc : snap.getDocuments()) {
+                Map<String, Object> data = doc.getData();
+                if (data == null) continue;
+                Store store = objectMapper.convertValue(data, Store.class);
+                store.setId(doc.getId());
+                if (store.getName() != null && store.getName().toLowerCase().contains(q)) {
+                    results.add(store);
+                }
+            }
+            return results;
+        } catch (InterruptedException | ExecutionException e) {
+            log.warn("Failed to search custom stores: {}", e.getMessage());
+            Thread.currentThread().interrupt();
+            return List.of();
         }
     }
 
@@ -487,6 +531,16 @@ public class FirebaseService {
         user.setPictureUrl((String) data.get("pictureUrl"));
         if (data.get("selectedStoreIds") instanceof List) {
             user.setSelectedStoreIds((List<String>) data.get("selectedStoreIds"));
+        }
+        if (data.get("selectedStores") instanceof List) {
+            List<?> raw = (List<?>) data.get("selectedStores");
+            List<Store> stores = new ArrayList<>();
+            for (Object item : raw) {
+                if (item instanceof Map) {
+                    stores.add(objectMapper.convertValue(item, Store.class));
+                }
+            }
+            user.setSelectedStores(stores);
         }
         if (data.get("menuConfig") instanceof Map) {
             user.setMenuConfig(objectMapper.convertValue(data.get("menuConfig"), MenuConfig.class));
