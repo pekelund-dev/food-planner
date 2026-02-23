@@ -76,9 +76,9 @@
                                 <input type="checkbox"
                                        th:checked="${meal.completed}"
                                        class="w-4 h-4 accent-primary-600 cursor-pointer"
-                                       th:attr="hx-post='/menu/' + ${weekId} + '/meal/' + ${dayName} + '/breakfast/' + ${stat.index} + '/complete',
-                                                hx-vals='{\"completed\": true}',
-                                                hx-trigger='change'">
+                                       th:attr="hx-post='/menu/' + ${weekId} + '/meal/' + ${dayName} + '/breakfast/' + ${stat.index} + '/complete'"
+                                       hx-vals='{"completed": true}'
+                                       hx-trigger="change">
                             </div>
                         </div>
                     </div>
@@ -120,9 +120,9 @@
                                 <input type="checkbox"
                                        th:checked="${meal.completed}"
                                        class="w-4 h-4 accent-primary-600 cursor-pointer"
-                                       th:attr="hx-post='/menu/' + ${weekId} + '/meal/' + ${dayName} + '/dinner/' + ${stat.index} + '/complete',
-                                                hx-include='this',
-                                                hx-trigger='change'">
+                                       th:attr="hx-post='/menu/' + ${weekId} + '/meal/' + ${dayName} + '/dinner/' + ${stat.index} + '/complete'"
+                                       hx-vals='{"completed": true}'
+                                       hx-trigger="change">
                             </div>
                         </div>
                     </div>

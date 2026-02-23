@@ -56,12 +56,8 @@
                                 <input type="checkbox"
                                        th:checked="${item.checked}"
                                        class="w-5 h-5 accent-primary-600 cursor-pointer flex-shrink-0"
-                                       th:attr="hx-post='/shopping/' + ${list.id} + '/items/' + ${item.id} + '/check',
-                                                hx-vals='{\"checked\": true}',
-                                                hx-trigger='change',
-                                                hx-target='#progress',
-                                                hx-swap='outerHTML',
-                                                onchange='toggleCheck(this, \'' + ${item.id} + '\')'">
+                                       th:attr="data-item-id=${item.id}"
+                                       onchange="toggleCheck(this, this.dataset.itemId)">
                                 <div class="flex-1">
                                     <span class="font-medium text-gray-800"
                                           th:classappend="${item.checked ? 'line-through text-gray-400' : ''}"
@@ -97,7 +93,8 @@
                                 <input type="checkbox"
                                        th:checked="${item.checked}"
                                        class="w-5 h-5 accent-primary-600 cursor-pointer"
-                                       th:attr="onchange='toggleCheck(this, \'' + ${item.id} + '\')'">
+                                       th:attr="data-item-id=${item.id}"
+                                       onchange="toggleCheck(this, this.dataset.itemId)">
                                 <span class="font-medium text-gray-800"
                                       th:classappend="${item.checked ? 'line-through text-gray-400' : ''}"
                                       th:text="${item.name + ' – ' + item.amount + ' ' + (item.unit ?: '')}">Item</span>
