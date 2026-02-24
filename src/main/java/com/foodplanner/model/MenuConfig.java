@@ -15,6 +15,7 @@ public class MenuConfig {
     private String additionalInstructions;
     private boolean preferBudgetFriendly = true;
     private boolean useStoreOffers = true;
+    private String geminiModel = "gemini-2.5-flash";
 
     public MenuConfig() {}
 
@@ -50,4 +51,7 @@ public class MenuConfig {
 
     public boolean isUseStoreOffers() { return useStoreOffers; }
     public void setUseStoreOffers(boolean useStoreOffers) { this.useStoreOffers = useStoreOffers; }
+
+    public String getGeminiModel() { return geminiModel; }
+    public void setGeminiModel(String geminiModel) { this.geminiModel = geminiModel; }
 }

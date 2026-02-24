@@ -53,7 +53,8 @@ public class ShoppingListService {
             }
         }
 
-        List<ShoppingList.ShoppingItem> items = geminiService.generateShoppingItems(menu, recipes, offers);
+        List<ShoppingList.ShoppingItem> items = geminiService.generateShoppingItems(menu, recipes, offers,
+                user != null && user.getMenuConfig() != null ? user.getMenuConfig().getGeminiModel() : "gemini-2.5-flash");
         enrichWithOffers(items, offers);
 
         ShoppingList list = new ShoppingList();

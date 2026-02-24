@@ -22,6 +22,7 @@ class FoodPlannerApplicationTests {
         assertFalse(config.isIncludeLunch());
         assertTrue(config.isPreferBudgetFriendly());
         assertTrue(config.isUseStoreOffers());
+        assertEquals("gemini-2.5-flash", config.getGeminiModel());
     }
 
     @Test
