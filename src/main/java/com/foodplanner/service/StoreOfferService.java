@@ -329,8 +329,7 @@ public class StoreOfferService {
      * Fetch real offers for a specific store by:
      * 1. Using Playwright to navigate to the chain's offers page and capture rendered content.
      * 2. Asking the AI to extract structured offer data from that content.
-     * Falls back to asking the AI to generate typical offers from its training knowledge
-     * if Playwright cannot reach the page (e.g. browser binaries not installed, network error).
+     * Returns an empty list if Playwright cannot reach the page or AI extracts no offers.
      */
     private List<StoreOffer> fetchOffersViaPlaywright(Store store) {
         if (geminiService == null) return List.of();
@@ -351,16 +350,13 @@ public class StoreOfferService {
                 if (!offers.isEmpty()) {
                     return offers;
                 }
-                log.info("AI extracted no offers from Playwright content for '{}'; falling back to AI generation",
-                        store.getName());
+                log.info("AI extracted no offers from Playwright content for '{}'", store.getName());
             } else {
-                log.info("Playwright returned empty content for '{}'; falling back to AI generation",
-                        store.getName());
+                log.info("Playwright returned empty content for '{}'", store.getName());
             }
         }
 
-        // Fallback: ask AI to generate typical offers from its training knowledge
-        return geminiService.generateOffersForStore(store.getName(), store.getId());
+        return List.of();
     }
 
     /**
