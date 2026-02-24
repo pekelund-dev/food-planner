@@ -380,9 +380,11 @@ public class GeminiService {
             }
         }
 
-        // Also handle a response that starts with [ or { directly — return as-is
+        // Handle a response that starts with [ or { directly.
+        // The AI may return a truncated array (no closing ]) — repair it so Jackson doesn't fail
+        // with JsonEOFException when the response hits the output-token limit mid-array.
         if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
-            return trimmed;
+            return repairTruncatedJson(trimmed);
         }
 
         // Last resort: find first [ or { (JSON array/object start) within the response
@@ -403,6 +405,38 @@ public class GeminiService {
         }
 
         return trimmed;
+    }
+
+    /**
+     * Repairs a truncated JSON array or object that was cut off before the closing bracket
+     * (e.g. when the AI response hits the output-token limit mid-array).
+     *
+     * <ul>
+     *   <li>If the response already ends with the correct close bracket — return as-is.
+     *   <li>If the last occurrence of the close bracket is somewhere earlier — truncate there.
+     *   <li>For truncated arrays: find the last complete {@code }} and append {@code ]}.
+     * </ul>
+     */
+    private String repairTruncatedJson(String json) {
+        if (json == null || json.isEmpty()) return json;
+        char expectedClose = json.charAt(0) == '[' ? ']' : '}';
+        // Already ends with the expected close bracket — no repair needed
+        if (json.charAt(json.length() - 1) == expectedClose) return json;
+        // Find the last occurrence of the expected close bracket
+        int lastClose = json.lastIndexOf(expectedClose);
+        if (lastClose > 0) {
+            log.debug("Repairing truncated JSON: truncating at position {} (last '{}')", lastClose + 1, expectedClose);
+            return json.substring(0, lastClose + 1);
+        }
+        // No close bracket at all — for a truncated array, find the last complete object '}'
+        if (json.charAt(0) == '[') {
+            int lastBrace = json.lastIndexOf('}');
+            if (lastBrace > 0) {
+                log.debug("Repairing truncated JSON array: no ']' found, closing after last '}}' at {}", lastBrace + 1);
+                return json.substring(0, lastBrace + 1) + "]";
+            }
+        }
+        return json;
     }
 
     // ---- Store offer extraction ----
@@ -484,10 +518,11 @@ public class GeminiService {
                 + "- productCategory: one of the categories above (string)\n"
                 + "- unit: unit of measure (e.g. kg, st, förp, l)\n"
                 + "- offerDescription: verbatim multi-buy deal text, or empty string\n\n"
-                + "Return a JSON array only, no markdown fences, no commentary:\n"
-                + "[{\"productName\": \"string\", \"salePrice\": number, \"originalPrice\": number, "
-                + "\"discountPercent\": number, \"productCategory\": \"string\", \"unit\": \"string\", "
-                + "\"offerDescription\": \"string\"}]";
+                + "Return a JSON array ONLY — no markdown fences, no commentary, no extra whitespace between tokens "
+                + "(compact JSON to maximize the number of offers that fit in the response):\n"
+                + "[{\"productName\":\"string\",\"salePrice\":number,\"originalPrice\":number,"
+                + "\"discountPercent\":number,\"productCategory\":\"string\",\"unit\":\"string\","
+                + "\"offerDescription\":\"string\"}]";
         try {
             String response = callAi(prompt);
             log.info("AI raw response length for '{}': {} chars", storeName,
@@ -530,8 +565,11 @@ public class GeminiService {
 
     private List<StoreOffer> parseExtractedOffers(String json, String storeName, String storeId) {
         List<StoreOffer> offers = new ArrayList<>();
+        // Repair truncated JSON arrays before parsing (e.g. response cut off at token limit)
+        String toParse = repairTruncatedJson(json);
+        boolean wasRepaired = !toParse.equals(json);
         try {
-            JsonNode root = objectMapper.readTree(json);
+            JsonNode root = objectMapper.readTree(toParse);
             if (!root.isArray()) return offers;
             for (JsonNode node : root) {
                 StoreOffer offer = new StoreOffer();
@@ -562,6 +600,10 @@ public class GeminiService {
                 if (!offer.getProductName().isBlank()) {
                     offers.add(offer);
                 }
+            }
+            if (wasRepaired) {
+                log.warn("AI response for '{}' was truncated; successfully parsed {} offers from repaired JSON",
+                        storeName, offers.size());
             }
         } catch (Exception e) {
             log.warn("Failed to parse extracted offers JSON", e);
