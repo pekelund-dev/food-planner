@@ -6,6 +6,7 @@ import com.foodplanner.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -366,24 +367,179 @@ public class GeminiService {
     private String stripMarkdownFences(String text) {
         if (text == null) return "{}";
         String trimmed = text.strip();
-        if (trimmed.startsWith("```")) {
-            int firstNewline = trimmed.indexOf('\n');
+
+        // Handle code fences that may appear anywhere in the response, e.g. when Gemini
+        // adds a preamble like "Here are the offers:\n```json\n[...]\n```"
+        int fenceStart = trimmed.indexOf("```");
+        if (fenceStart >= 0) {
+            // Skip the opening fence line (e.g. ```json or ```)
+            int firstNewline = trimmed.indexOf('\n', fenceStart);
             int lastFence = trimmed.lastIndexOf("```");
-            if (firstNewline > 0 && lastFence > firstNewline) {
+            if (firstNewline > fenceStart && lastFence > firstNewline) {
                 return trimmed.substring(firstNewline + 1, lastFence).strip();
             }
         }
+
+        // Handle a response that starts with [ or { directly.
+        // The AI may return a truncated array (no closing ]) — repair it so Jackson doesn't fail
+        // with JsonEOFException when the response hits the output-token limit mid-array.
+        if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+            return repairTruncatedJson(trimmed);
+        }
+
+        // Last resort: find first [ or { (JSON array/object start) within the response
+        int arrayStart = trimmed.indexOf('[');
+        int objectStart = trimmed.indexOf('{');
+        if (arrayStart >= 0 || objectStart >= 0) {
+            int jsonStart;
+            if (arrayStart < 0) jsonStart = objectStart;
+            else if (objectStart < 0) jsonStart = arrayStart;
+            else jsonStart = Math.min(arrayStart, objectStart);
+
+            int arrayEnd = trimmed.lastIndexOf(']');
+            int objectEnd = trimmed.lastIndexOf('}');
+            int jsonEnd = Math.max(arrayEnd, objectEnd);
+            if (jsonEnd > jsonStart) {
+                return trimmed.substring(jsonStart, jsonEnd + 1);
+            }
+        }
+
         return trimmed;
     }
 
-    // ---- Store offer fetching via Gemini ----
+    /**
+     * Repairs a truncated JSON array or object that was cut off before the closing bracket
+     * (e.g. when the AI response hits the output-token limit mid-array).
+     *
+     * <ul>
+     *   <li>If the response already ends with the correct close bracket — return as-is.
+     *   <li>If the last occurrence of the close bracket is somewhere earlier — truncate there.
+     *   <li>For truncated arrays: find the last complete {@code }} and append {@code ]}.
+     * </ul>
+     */
+    private String repairTruncatedJson(String json) {
+        if (json == null || json.isEmpty()) return json;
+        char expectedClose = json.charAt(0) == '[' ? ']' : '}';
+        // Already ends with the expected close bracket — no repair needed
+        if (json.charAt(json.length() - 1) == expectedClose) return json;
+        // Find the last occurrence of the expected close bracket
+        int lastClose = json.lastIndexOf(expectedClose);
+        if (lastClose > 0) {
+            log.debug("Repairing truncated JSON: truncating at position {} (last '{}')", lastClose + 1, expectedClose);
+            return json.substring(0, lastClose + 1);
+        }
+        // No close bracket at all — for a truncated array, find the last complete object '}'
+        if (json.charAt(0) == '[') {
+            int lastBrace = json.lastIndexOf('}');
+            if (lastBrace > 0) {
+                log.debug("Repairing truncated JSON array: no ']' found, closing after last '}}' at {}", lastBrace + 1);
+                return json.substring(0, lastBrace + 1) + "]";
+            }
+        }
+        return json;
+    }
+
+    // ---- Store offer extraction ----
 
     /**
-     * Ask Gemini to generate plausible current weekly offers for a specific Swedish grocery store.
-     * Swedish grocery store websites are JavaScript SPAs; a plain HTTP GET only returns a shell
-     * with no product data. Instead, we ask Gemini to use its training knowledge of the store
-     * to produce realistic-looking typical weekly offers (products, sale prices, categories).
-     * Note: offers are AI-estimated and may not reflect the exact live promotions.
+     * Ask Gemini to find the store-specific offers page URL for a Swedish grocery store.
+     * Used for custom stores that are not in the static KNOWN_STORES catalogue.
+     *
+     * @param storeName  full store name, e.g. "ICA Kvantum Malmborgs Caroli"
+     * @param chain      chain key, e.g. "ica"
+     * @param chainBase  chain-level offers URL as a reference, e.g. "https://www.ica.se/erbjudanden/"
+     * @return the store-specific URL, or {@code null} if Gemini cannot determine it
+     */
+    public String findOffersUrl(String storeName, String chain, String chainBase) {
+        if (!isConfigured()) return null;
+        String safeName = storeName == null ? "" : storeName.replaceAll("[\\p{Cntrl}]", " ").trim();
+        String prompt = "Vilken URL används för veckans erbjudanden från \"" + safeName + "\" på dess butiksspecifika sida?\n\n"
+                + "URL-mönstret för svenska matbutikskedjor:\n"
+                + "- ICA: https://www.ica.se/erbjudanden/{butiksnamn-med-bindestreck}-{numeriskt-butiks-id}/\n"
+                + "  Exempel: ICA Kvantum Malmborgs Caroli → https://www.ica.se/erbjudanden/ica-kvantum-malmborgs-caroli-1004490/\n"
+                + "  Exempel: ICA Maxi Haninge → https://www.ica.se/erbjudanden/ica-maxi-haninge-1003434/\n"
+                + "- Willys: https://www.willys.se/erbjudanden/{butiksnamn-med-bindestreck}-{numeriskt-butiks-id}/\n"
+                + "- Coop: https://www.coop.se/erbjudanden/{butiksnamn-med-bindestreck}-{numeriskt-butiks-id}/\n\n"
+                + "Svara med ENBART URL:en på en rad. Inga förklaringar, ingen markdown, inga citattecken.";
+        try {
+            // Enable Google Search grounding so Gemini can look up the current store URL
+            // rather than relying solely on training data (which may be outdated).
+            GoogleGenAiChatOptions searchOptions = GoogleGenAiChatOptions.builder()
+                    .googleSearchRetrieval(true)
+                    .build();
+            String response = chatClient.prompt()
+                    .user(prompt)
+                    .options(searchOptions)
+                    .call()
+                    .content();
+            if (response == null) return null;
+            String url = response.trim().lines().findFirst().orElse("").trim();
+            // Only return if it looks like a plausible HTTPS URL
+            if (url.startsWith("https://")) {
+                log.info("Gemini inferred offers URL for '{}': {}", storeName, url);
+                return url;
+            }
+            log.info("Gemini did not return a valid URL for '{}', got: {}", storeName, url);
+            return null;
+        } catch (Exception e) {
+            log.debug("Failed to infer offers URL for '{}' via Gemini: {}", storeName, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Ask the AI to extract real product offers from rendered page content fetched by Playwright.
+     * The {@code pageContent} argument is the visible text of the store's offers page.
+     */
+    public List<StoreOffer> extractOffersFromHtml(String pageContent, String storeName, String storeId) {
+        if (!isConfigured()) return List.of();
+        // Strip control characters from the store name to prevent prompt injection
+        String safeName = storeName == null ? "" : storeName.replaceAll("[\\p{Cntrl}]", " ").trim();
+        String prompt = "You are extracting grocery store offer data from a Swedish store's offers page.\n"
+                + "Store name: \"" + safeName + "\"\n\n"
+                + "Below is the full visible text of the store's current offers page:\n"
+                + "--- BEGIN CONTENT ---\n" + pageContent + "\n--- END CONTENT ---\n\n"
+                + "IMPORTANT RULES:\n"
+                + "1. Extract EVERY single product offer present in the content — do not stop early or truncate the list.\n"
+                + "   Swedish store pages typically contain 30–80 weekly offers; extract them all.\n"
+                + "2. Always include the BRAND name in productName (e.g. \"Arla Mellanmjölk 1,5%\", not just \"Mjölk\").\n"
+                + "3. For multi-buy deals (e.g. \"2 för 25 kr\", \"3 för 2\", \"Köp 2 betala för 1\"):\n"
+                + "   - Set salePrice to the effective per-unit price (total deal price ÷ required quantity).\n"
+                + "   - Set originalPrice to the normal single-unit price (if shown).\n"
+                + "   - Set offerDescription to the verbatim deal text from the page (e.g. \"2 för 25 kr\").\n"
+                + "   - Calculate discountPercent = ((originalPrice - salePrice) / originalPrice) * 100.\n"
+                + "4. For simple price-cut offers, leave offerDescription as an empty string.\n"
+                + "5. productCategory must be one of: Meat, Fish, Dairy, Produce, Pantry, Beverages, Snacks, Bakery, Frozen, Cleaning, Other.\n\n"
+                + "For each offer return these fields:\n"
+                + "- productName: brand + product name (string)\n"
+                + "- salePrice: effective per-unit sale price in SEK (number)\n"
+                + "- originalPrice: normal full price per unit in SEK (number, 0 if not shown)\n"
+                + "- discountPercent: pre-calculated discount percentage (number, 0 if unknown)\n"
+                + "- productCategory: one of the categories above (string)\n"
+                + "- unit: unit of measure (e.g. kg, st, förp, l)\n"
+                + "- offerDescription: verbatim multi-buy deal text, or empty string\n\n"
+                + "Return a JSON array ONLY — no markdown fences, no commentary, no extra whitespace between tokens "
+                + "(compact JSON to maximize the number of offers that fit in the response):\n"
+                + "[{\"productName\":\"string\",\"salePrice\":number,\"originalPrice\":number,"
+                + "\"discountPercent\":number,\"productCategory\":\"string\",\"unit\":\"string\","
+                + "\"offerDescription\":\"string\"}]";
+        try {
+            String response = callAi(prompt);
+            log.info("AI raw response length for '{}': {} chars", storeName,
+                    response != null ? response.length() : 0);
+            log.debug("AI raw response for '{}': {}", storeName, response);
+            List<StoreOffer> offers = parseExtractedOffers(stripMarkdownFences(response), storeName, storeId);
+            log.info("AI extracted {} offers from page content for store '{}'", offers.size(), storeName);
+            return offers;
+        } catch (Exception e) {
+            log.warn("Failed to extract offers from page content for '{}': {}", storeName, e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * Fallback: ask Gemini to generate plausible weekly offers based solely on its training
+     * knowledge of the store. Used when Playwright cannot fetch the live offers page.
      */
     public List<StoreOffer> generateOffersForStore(String storeName, String storeId) {
         if (!isConfigured()) return List.of();
@@ -399,18 +555,21 @@ public class GeminiService {
         try {
             String response = callAi(prompt);
             List<StoreOffer> offers = parseExtractedOffers(stripMarkdownFences(response), storeName, storeId);
-            log.info("Gemini generated {} offers for store '{}'", offers.size(), storeName);
+            log.info("Gemini generated {} fallback offers for store '{}'", offers.size(), storeName);
             return offers;
         } catch (Exception e) {
-            log.warn("Failed to generate offers for '{}': {}", storeName, e.getMessage());
+            log.warn("Failed to generate fallback offers for '{}': {}", storeName, e.getMessage());
             return List.of();
         }
     }
 
     private List<StoreOffer> parseExtractedOffers(String json, String storeName, String storeId) {
         List<StoreOffer> offers = new ArrayList<>();
+        // Repair truncated JSON arrays before parsing (e.g. response cut off at token limit)
+        String toParse = repairTruncatedJson(json);
+        boolean wasRepaired = !toParse.equals(json);
         try {
-            JsonNode root = objectMapper.readTree(json);
+            JsonNode root = objectMapper.readTree(toParse);
             if (!root.isArray()) return offers;
             for (JsonNode node : root) {
                 StoreOffer offer = new StoreOffer();
@@ -422,10 +581,17 @@ public class GeminiService {
                 offer.setOriginalPrice(node.path("originalPrice").asDouble(0));
                 offer.setProductCategory(node.path("productCategory").asText("Other"));
                 offer.setUnit(node.path("unit").asText(""));
+                offer.setOfferDescription(node.path("offerDescription").asText(""));
                 offer.setFetchedAt(Instant.now());
                 offer.setValidFrom(LocalDate.now());
                 offer.setValidTo(LocalDate.now().plusDays(7));
-                if (offer.getOriginalPrice() > 0 && offer.getSalePrice() > 0
+                // Prefer AI-provided discountPercent: the AI accounts for deal structure
+                // (e.g., for "3 for 2" there's no meaningful originalPrice/salePrice pair),
+                // whereas the simple formula below only works for straightforward price cuts.
+                double aiDiscount = node.path("discountPercent").asDouble(0);
+                if (aiDiscount > 0) {
+                    offer.setDiscountPercent(aiDiscount);
+                } else if (offer.getOriginalPrice() > 0 && offer.getSalePrice() > 0
                         && offer.getOriginalPrice() > offer.getSalePrice()) {
                     double discount = ((offer.getOriginalPrice() - offer.getSalePrice())
                             / offer.getOriginalPrice()) * 100;
@@ -434,6 +600,10 @@ public class GeminiService {
                 if (!offer.getProductName().isBlank()) {
                     offers.add(offer);
                 }
+            }
+            if (wasRepaired) {
+                log.warn("AI response for '{}' was truncated; successfully parsed {} offers from repaired JSON",
+                        storeName, offers.size());
             }
         } catch (Exception e) {
             log.warn("Failed to parse extracted offers JSON", e);
