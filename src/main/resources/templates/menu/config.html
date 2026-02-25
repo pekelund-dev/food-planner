@@ -235,6 +235,24 @@
                 </script>
             </div>
 
+            <!-- AI Model -->
+            <div class="card p-6">
+                <h2 class="text-lg font-bold text-gray-800 mb-5 flex items-center space-x-2">
+                    <span>🤖</span><span>AI Model</span>
+                </h2>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Gemini Model</label>
+                    <select name="geminiModel"
+                            class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white">
+                        <option value="gemini-2.5-flash-lite"
+                                th:selected="${config.geminiModel == 'gemini-2.5-flash-lite'}">Gemini 2.5 Flash Lite</option>
+                        <option value="gemini-2.5-flash"
+                                th:selected="${config.geminiModel == 'gemini-2.5-flash'}">Gemini 2.5 Flash</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-2">Select the Gemini model used for AI menu and recipe generation.</p>
+                </div>
+            </div>
+
             <!-- Additional Instructions -->
             <div class="card p-6">
                 <h2 class="text-lg font-bold text-gray-800 mb-5 flex items-center space-x-2">

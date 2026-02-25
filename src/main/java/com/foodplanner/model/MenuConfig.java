@@ -15,6 +15,7 @@ public class MenuConfig {
     private String additionalInstructions;
     private boolean preferBudgetFriendly = true;
     private boolean useStoreOffers = true;
+    private String geminiModel = "gemini-2.5-flash";
     private String startDayOfWeek = "MONDAY";
     private int menuSpanDays = 7;
 
@@ -53,6 +54,8 @@ public class MenuConfig {
     public boolean isUseStoreOffers() { return useStoreOffers; }
     public void setUseStoreOffers(boolean useStoreOffers) { this.useStoreOffers = useStoreOffers; }
 
+    public String getGeminiModel() { return geminiModel; }
+    public void setGeminiModel(String geminiModel) { this.geminiModel = geminiModel; }
     public String getStartDayOfWeek() { return startDayOfWeek; }
     public void setStartDayOfWeek(String startDayOfWeek) { this.startDayOfWeek = startDayOfWeek; }
 

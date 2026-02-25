@@ -23,6 +23,7 @@ class FoodPlannerApplicationTests {
         assertFalse(config.isIncludeLunch());
         assertTrue(config.isPreferBudgetFriendly());
         assertTrue(config.isUseStoreOffers());
+        assertEquals("gemini-2.5-flash", config.getGeminiModel());
         assertEquals("MONDAY", config.getStartDayOfWeek());
         assertEquals(7, config.getMenuSpanDays());
     }

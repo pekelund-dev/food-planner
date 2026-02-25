@@ -62,7 +62,7 @@ public class GeminiService {
         }
 
         String prompt = buildMenuPrompt(config, currentOffers, feedback);
-        String response = callAi(prompt);
+        String response = callAi(prompt, config.getGeminiModel());
         return parseMenuResponse(userId, response, config);
     }
 
@@ -76,7 +76,7 @@ public class GeminiService {
         }
 
         String prompt = buildRecipePrompt(mealName, config, currentOffers);
-        String response = callAi(prompt);
+        String response = callAi(prompt, config.getGeminiModel());
         return parseRecipeResponse(userId, mealName, response);
     }
 
@@ -85,13 +85,14 @@ public class GeminiService {
      */
     public List<ShoppingList.ShoppingItem> generateShoppingItems(WeeklyMenu menu,
                                                                    Map<String, Recipe> recipes,
-                                                                   List<StoreOffer> offers) {
+                                                                   List<StoreOffer> offers,
+                                                                   String model) {
         if (!isConfigured()) {
             return buildSampleShoppingItems(recipes, offers);
         }
 
         String prompt = buildShoppingListPrompt(menu, recipes, offers);
-        String response = callAi(prompt);
+        String response = callAi(prompt, model);
         return parseShoppingListResponse(response, offers);
     }
 
@@ -116,10 +117,11 @@ public class GeminiService {
     /**
      * Invoke the Spring AI ChatClient and return the raw text response.
      */
-    private String callAi(String prompt) {
+    private String callAi(String prompt, String model) {
         try {
             return chatClient.prompt()
                     .user(prompt)
+                    .options(GoogleGenAiChatOptions.builder().model(model).build())
                     .call()
                     .content();
         } catch (Exception e) {
@@ -611,7 +613,7 @@ public class GeminiService {
                 + "\"discountPercent\":number,\"productCategory\":\"string\",\"unit\":\"string\","
                 + "\"offerDescription\":\"string\"}]";
         try {
-            String response = callAi(prompt);
+            String response = callAi(prompt, "gemini-2.5-flash");
             log.info("AI raw response length for '{}': {} chars", storeName,
                     response != null ? response.length() : 0);
             log.debug("AI raw response for '{}': {}", storeName, response);
@@ -640,7 +642,7 @@ public class GeminiService {
                 + "[{\"productName\": \"string\", \"salePrice\": number, \"originalPrice\": number, "
                 + "\"productCategory\": \"string\", \"unit\": \"string\"}]";
         try {
-            String response = callAi(prompt);
+            String response = callAi(prompt, "gemini-2.5-flash");
             List<StoreOffer> offers = parseExtractedOffers(stripMarkdownFences(response), storeName, storeId);
             log.info("Gemini generated {} fallback offers for store '{}'", offers.size(), storeName);
             return offers;
