@@ -48,17 +48,32 @@ public class HomeController {
         String name = principal.getAttribute("name");
         String picture = principal.getAttribute("picture");
 
-        User user = firebaseService.getOrCreateUser(userId, email, name, picture);
-        model.addAttribute("user", user);
+        // Get or create user — fall back to a minimal User if Firebase is unavailable
+        try {
+            User user = firebaseService.getOrCreateUser(userId, email, name, picture);
+            model.addAttribute("user", user);
+        } catch (Exception e) {
+            User fallback = new User();
+            fallback.setId(userId);
+            fallback.setEmail(email);
+            fallback.setName(name);
+            fallback.setPictureUrl(picture);
+            model.addAttribute("user", fallback);
+        }
+
+        // Current week id — safe to compute independently
+        try {
+            model.addAttribute("currentWeekId", menuService.getCurrentWeekId());
+        } catch (Exception e) {
+            model.addAttribute("currentWeekId", null);
+        }
 
         // Get current week menu
         try {
             var currentMenu = menuService.getCurrentWeekMenu(userId);
             model.addAttribute("currentMenu", currentMenu);
-            model.addAttribute("currentWeekId", menuService.getCurrentWeekId());
         } catch (Exception e) {
             model.addAttribute("currentMenu", null);
-            model.addAttribute("currentWeekId", menuService.getCurrentWeekId());
         }
 
         // Get recent shopping lists
