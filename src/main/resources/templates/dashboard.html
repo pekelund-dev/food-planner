@@ -74,7 +74,7 @@
                         <span class="text-sm font-semibold text-gray-500 w-24"
                               th:text="${entry.key.substring(0,3)}">MON</span>
                         <span class="font-medium text-gray-800"
-                              th:text="${entry.value?.dinner?.get(0)?.mealName ?: #{dashboard.menu.nomeal}}">Meal name</span>
+                              th:text="${entry.value?.dinner?.get(0)?.mealName} ?: #{dashboard.menu.nomeal}">Meal name</span>
                     </div>
                     <span th:if="${entry.value?.dinner?.get(0)?.completed}"
                           class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium" th:text="#{dashboard.menu.done}">Done ✓</span>
