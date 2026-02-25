@@ -35,6 +35,23 @@
                                placeholder="e.g. Italian, Asian, Nordic..."
                                class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
                     </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Menu Starts On</label>
+                        <select name="startDayOfWeek"
+                                class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+                            <th:block th:each="day : ${ {'MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY'} }">
+                                <option th:value="${day}"
+                                        th:text="${#strings.capitalize(day.toLowerCase())}"
+                                        th:selected="${config.startDayOfWeek == day}">Monday</option>
+                            </th:block>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Menu Spans (days)</label>
+                        <input type="number" name="menuSpanDays" min="1" max="7"
+                               th:value="${config.menuSpanDays}"
+                               class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+                    </div>
                 </div>
 
                 <div class="mt-6">

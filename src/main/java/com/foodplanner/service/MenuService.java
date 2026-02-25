@@ -15,6 +15,7 @@ import java.util.*;
 public class MenuService {
 
     private static final Logger log = LoggerFactory.getLogger(MenuService.class);
+    private static final String[] ALL_DAYS = {"MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"};
 
     private final FirebaseService firebaseService;
     private final GeminiService geminiService;
@@ -38,6 +39,10 @@ public class MenuService {
     }
 
     public WeeklyMenu generateAndSaveWeeklyMenu(String userId) {
+        return generateAndSaveWeeklyMenuForWeek(userId, getNextWeekId(), null);
+    }
+
+    public WeeklyMenu generateAndSaveWeeklyMenuForWeek(String userId, String targetWeekId, String feedback) {
         User user = firebaseService.getUser(userId);
         MenuConfig config = user != null && user.getMenuConfig() != null
                 ? user.getMenuConfig() : new MenuConfig();
@@ -49,7 +54,6 @@ public class MenuService {
                 if (!store.hasValidId()) continue;
                 List<StoreOffer> storeOffers = storeOfferService.getActiveOffers(store.getId());
                 if (storeOffers.isEmpty()) {
-                    // Auto-fetch offers on first menu generation
                     log.info("No offers cached for '{}', auto-fetching before menu generation", store.getName());
                     storeOffers = storeOfferService.refreshOffersForSpecificStore(store);
                     if (storeOffers.isEmpty()) {
@@ -60,12 +64,63 @@ public class MenuService {
             }
         }
 
-        WeeklyMenu menu = geminiService.generateWeeklyMenu(userId, config, offers);
+        WeeklyMenu menu = geminiService.generateWeeklyMenu(userId, config, offers, feedback);
+        // Override week dates with the target week
+        menu.setWeekId(targetWeekId);
+        LocalDate weekStart = parseWeekId(targetWeekId);
+        menu.setWeekStart(weekStart);
+        int span = config.getMenuSpanDays() > 0 ? config.getMenuSpanDays() : 7;
+        menu.setWeekEnd(weekStart.plusDays(span - 1));
+        return firebaseService.saveWeeklyMenu(userId, menu);
+    }
+
+    public WeeklyMenu regenerateDish(String userId, String weekId, String day,
+                                      String mealType, int mealIndex, String feedback) {
+        WeeklyMenu menu = firebaseService.getWeeklyMenu(userId, weekId);
+        if (menu == null || menu.getDays() == null) return null;
+
+        User user = firebaseService.getUser(userId);
+        MenuConfig config = user != null && user.getMenuConfig() != null
+                ? user.getMenuConfig() : new MenuConfig();
+
+        List<StoreOffer> offers = new ArrayList<>();
+        if (user != null && config.isUseStoreOffers()) {
+            List<Store> selectedStores = user.getSelectedStores() != null ? user.getSelectedStores() : List.of();
+            for (Store store : selectedStores) {
+                if (store.hasValidId()) {
+                    offers.addAll(storeOfferService.getActiveOffers(store.getId()));
+                }
+            }
+        }
+
+        WeeklyMenu.DayMenu dayMenu = menu.getDays().get(day.toUpperCase());
+        if (dayMenu == null) return menu;
+
+        List<WeeklyMenu.PlannedMeal> meals = switch (mealType.toLowerCase()) {
+            case "breakfast" -> dayMenu.getBreakfast();
+            case "lunch" -> dayMenu.getLunch();
+            default -> dayMenu.getDinner();
+        };
+
+        String currentMealName = (meals != null && mealIndex < meals.size())
+                ? meals.get(mealIndex).getMealName() : "Unknown meal";
+
+        WeeklyMenu.PlannedMeal newMeal = geminiService.regenerateSingleMeal(currentMealName, config, offers, feedback);
+        newMeal.setCompleted(false);
+
+        if (meals != null && mealIndex < meals.size()) {
+            meals.set(mealIndex, newMeal);
+        }
+
         return firebaseService.saveWeeklyMenu(userId, menu);
     }
 
     public WeeklyMenu saveWeeklyMenu(String userId, WeeklyMenu menu) {
         return firebaseService.saveWeeklyMenu(userId, menu);
+    }
+
+    public List<String> listMenuWeekIds(String userId) {
+        return firebaseService.listWeeklyMenuIds(userId);
     }
 
     public void updateMealCompletion(String userId, String weekId, String day,
@@ -89,6 +144,21 @@ public class MenuService {
         firebaseService.saveWeeklyMenu(userId, menu);
     }
 
+    public String[] getMenuDays(MenuConfig config) {
+        if (config == null) return ALL_DAYS.clone();
+        String start = config.getStartDayOfWeek() != null ? config.getStartDayOfWeek().toUpperCase() : "MONDAY";
+        int span = config.getMenuSpanDays() > 0 ? Math.min(config.getMenuSpanDays(), 7) : 7;
+        int startIdx = 0;
+        for (int i = 0; i < ALL_DAYS.length; i++) {
+            if (ALL_DAYS[i].equals(start)) { startIdx = i; break; }
+        }
+        String[] result = new String[span];
+        for (int i = 0; i < span; i++) {
+            result[i] = ALL_DAYS[(startIdx + i) % 7];
+        }
+        return result;
+    }
+
     public String getCurrentWeekId() {
         LocalDate monday = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         return formatWeekId(monday);
@@ -99,14 +169,36 @@ public class MenuService {
         return formatWeekId(nextMonday);
     }
 
+    public String getPreviousWeekId(String weekId) {
+        return formatWeekId(parseWeekId(weekId).minusWeeks(1));
+    }
+
+    public String getNextWeekIdFrom(String weekId) {
+        return formatWeekId(parseWeekId(weekId).plusWeeks(1));
+    }
+
     public static String formatWeekId(LocalDate date) {
-        // Use ISO week-based year and week number (e.g. "2025-W04")
         int year = date.get(IsoFields.WEEK_BASED_YEAR);
         int week = date.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
         return String.format("%04d-W%02d", year, week);
     }
 
+    public LocalDate parseWeekId(String weekId) {
+        try {
+            String[] parts = weekId.split("-W");
+            int year = Integer.parseInt(parts[0]);
+            int week = Integer.parseInt(parts[1]);
+            return LocalDate.now()
+                    .with(IsoFields.WEEK_BASED_YEAR, year)
+                    .with(IsoFields.WEEK_OF_WEEK_BASED_YEAR, week)
+                    .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        } catch (Exception e) {
+            log.warn("Failed to parse weekId '{}', using current week", weekId);
+            return LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        }
+    }
+
     public LocalDate getWeekStartDate(String weekId) {
-        return LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        return parseWeekId(weekId);
     }
 }

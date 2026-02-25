@@ -322,6 +322,25 @@ public class FirebaseService {
         }
     }
 
+    public List<String> listWeeklyMenuIds(String userId) {
+        try {
+            QuerySnapshot snapshot = getFirestore()
+                    .collection("users").document(userId)
+                    .collection("menus")
+                    .get().get();
+            List<String> ids = new ArrayList<>();
+            for (DocumentSnapshot doc : snapshot.getDocuments()) {
+                ids.add(doc.getId());
+            }
+            ids.sort(Collections.reverseOrder());
+            return ids;
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Error listing weekly menus for user {}", userId, e);
+            Thread.currentThread().interrupt();
+            return List.of();
+        }
+    }
+
     // ---- Rating operations ----
 
     public List<Rating> getRatings(String userId) {
