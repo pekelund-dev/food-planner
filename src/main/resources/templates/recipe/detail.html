@@ -3,15 +3,14 @@
       th:replace="~{fragments/layout :: layout(~{::title}, ~{::main})}"
       lang="en">
 <head>
-    <title th:text="${recipe.name + ' – Recipe'}">Recipe</title>
+    <title th:text="${recipe.name}">Recipe</title>
 </head>
 <body>
 <main th:fragment="content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="max-w-4xl">
         <!-- Back button -->
-        <a href="/recipes" class="inline-flex items-center text-gray-500 hover:text-gray-700 mb-6 text-sm font-medium">
-            ← Back to Recipes
-        </a>
+        <a href="/recipes" class="inline-flex items-center text-gray-500 hover:text-gray-700 mb-6 text-sm font-medium"
+           th:text="#{recipe.detail.back}">← Back to Recipes</a>
 
         <!-- Recipe Header -->
         <div class="card p-8 mb-6">
@@ -32,24 +31,24 @@
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div class="bg-gray-50 rounded-xl p-4 text-center">
                     <div class="text-2xl mb-1">⏱️</div>
-                    <p class="text-xs text-gray-500">Prep Time</p>
+                    <p class="text-xs text-gray-500" th:text="#{recipe.detail.preptime}">Prep Time</p>
                     <p class="font-bold text-gray-800" th:text="${recipe.prepTimeMinutes + ' min'}">15 min</p>
                 </div>
                 <div class="bg-gray-50 rounded-xl p-4 text-center">
                     <div class="text-2xl mb-1">🔥</div>
-                    <p class="text-xs text-gray-500">Cook Time</p>
+                    <p class="text-xs text-gray-500" th:text="#{recipe.detail.cooktime}">Cook Time</p>
                     <p class="font-bold text-gray-800" th:text="${recipe.cookTimeMinutes + ' min'}">30 min</p>
                 </div>
                 <div class="bg-gray-50 rounded-xl p-4 text-center">
                     <div class="text-2xl mb-1">👥</div>
-                    <p class="text-xs text-gray-500">Servings</p>
+                    <p class="text-xs text-gray-500" th:text="#{recipe.detail.servings}">Servings</p>
                     <p class="font-bold text-gray-800" th:text="${recipe.servings}">2</p>
                 </div>
                 <div class="bg-gray-50 rounded-xl p-4 text-center">
                     <div class="text-2xl mb-1">⭐</div>
-                    <p class="text-xs text-gray-500">Rating</p>
+                    <p class="text-xs text-gray-500" th:text="#{recipe.detail.rating}">Rating</p>
                     <p class="font-bold text-gray-800"
-                       th:text="${recipe.averageRating > 0 ? #numbers.formatDecimal(recipe.averageRating, 1, 1) + '/5' : 'Not rated'}">4.5/5</p>
+                       th:text="${recipe.averageRating > 0 ? #numbers.formatDecimal(recipe.averageRating, 1, 1) + '/5' : #{recipe.detail.notrated}}">4.5/5</p>
                 </div>
             </div>
 
@@ -66,7 +65,7 @@
             <div class="md:col-span-1">
                 <div class="card p-6">
                     <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center space-x-2">
-                        <span>🧺</span><span>Ingredients</span>
+                        <span>🧺</span><span th:text="#{recipe.detail.ingredients}">Ingredients</span>
                     </h2>
                     <ul class="space-y-3">
                         <li th:each="ingredient : ${recipe.ingredients}"
@@ -83,7 +82,7 @@
             <div class="md:col-span-2">
                 <div class="card p-6">
                     <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center space-x-2">
-                        <span>📋</span><span>Instructions</span>
+                        <span>📋</span><span th:text="#{recipe.detail.instructions}">Instructions</span>
                     </h2>
                     <ol class="space-y-4">
                         <li th:each="step, stat : ${recipe.instructions}"
@@ -100,12 +99,12 @@
         <!-- Rating Section -->
         <div class="card p-6 mt-6">
             <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center space-x-2">
-                <span>⭐</span><span>Ratings &amp; Reviews</span>
+                <span>⭐</span><span th:text="#{recipe.detail.ratings.title}">Ratings &amp; Reviews</span>
             </h2>
 
             <!-- Rate this recipe -->
             <div class="bg-gray-50 rounded-xl p-5 mb-6">
-                <h3 class="font-medium text-gray-800 mb-3">Rate this recipe</h3>
+                <h3 class="font-medium text-gray-800 mb-3" th:text="#{recipe.detail.ratings.rate}">Rate this recipe</h3>
                 <div class="flex items-center space-x-2 mb-3" id="starRating">
                     <span th:each="star : ${#numbers.sequence(1, 5)}"
                           class="text-3xl cursor-pointer hover:scale-110 transition-transform star-btn text-gray-300"
@@ -114,17 +113,18 @@
                 </div>
                 <input type="hidden" id="ratingScore" value="0">
                 <textarea id="ratingComment" rows="2"
-                          placeholder="Add a comment (optional)..."
+                          th:placeholder="#{recipe.detail.ratings.placeholder}"
                           class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500 mb-3"></textarea>
                 <button onclick="submitRating()"
-                        class="btn-primary text-sm">Submit Rating</button>
+                        class="btn-primary text-sm" th:text="#{recipe.detail.ratings.submit}">Submit Rating</button>
             </div>
 
             <!-- Existing ratings -->
             <div id="ratingsContainer"
                  hx-get="${'/recipes/' + recipe.id + '/ratings-fragment'}"
                  hx-trigger="load">
-                <div th:if="${#lists.isEmpty(ratings)}" class="text-center text-gray-500 py-4 text-sm">
+                <div th:if="${#lists.isEmpty(ratings)}" class="text-center text-gray-500 py-4 text-sm"
+                     th:text="#{recipe.detail.ratings.empty}">
                     No ratings yet. Be the first to rate!
                 </div>
                 <div th:each="rating : ${ratings}"
@@ -149,6 +149,7 @@
         const recipeId = /*[[${recipe.id}]]*/ '';
         const csrfToken = /*[[${_csrf.token}]]*/ '';
         const csrfHeader = /*[[${_csrf.headerName}]]*/ '';
+        const ratingAlert = /*[[#{recipe.detail.ratings.alert}]]*/ 'Please select a star rating.';
 
         function setRating(score) {
             document.getElementById('ratingScore').value = score;
@@ -162,7 +163,7 @@
         function submitRating() {
             const score = document.getElementById('ratingScore').value;
             const comment = document.getElementById('ratingComment').value;
-            if (!score || score === '0') { alert('Please select a star rating.'); return; }
+            if (!score || score === '0') { alert(ratingAlert); return; }
 
             fetch(`/recipes/${recipeId}/rate`, {
                 method: 'POST',

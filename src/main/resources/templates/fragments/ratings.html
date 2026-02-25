@@ -2,7 +2,8 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <body>
 <div th:fragment="ratingsFragment">
-    <div th:if="${#lists.isEmpty(ratings)}" class="text-center text-gray-500 py-4 text-sm">
+    <div th:if="${#lists.isEmpty(ratings)}" class="text-center text-gray-500 py-4 text-sm"
+         th:text="#{recipe.detail.ratings.empty}">
         No ratings yet. Be the first to rate!
     </div>
     <div th:each="rating : ${ratings}" class="border-b border-gray-100 last:border-0 py-4">

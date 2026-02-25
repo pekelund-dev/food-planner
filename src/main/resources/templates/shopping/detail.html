@@ -3,25 +3,23 @@
       th:replace="~{fragments/layout :: layout(~{::title}, ~{::main})}"
       lang="en">
 <head>
-    <title th:text="${list.name + ' – Shopping'}">Shopping List</title>
+    <title th:text="${list.name}">Shopping List</title>
 </head>
 <body>
 <main th:fragment="content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="max-w-2xl">
         <!-- Header -->
-        <a href="/shopping" class="inline-flex items-center text-gray-500 hover:text-gray-700 mb-6 text-sm font-medium">
-            ← Back to Shopping Lists
-        </a>
+        <a href="/shopping" class="inline-flex items-center text-gray-500 hover:text-gray-700 mb-6 text-sm font-medium"
+           th:text="#{shopping.detail.back}">← Back to Shopping Lists</a>
 
         <div class="flex items-center justify-between mb-6">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900" th:text="${list.name}">Shopping List</h1>
                 <p class="text-sm text-gray-500 mt-1"
-                   th:text="${list.checkedCount + '/' + (list.items != null ? list.items.size() : 0) + ' items checked'}">0/0 items</p>
+                   th:text="${list.checkedCount + '/' + (list.items != null ? list.items.size() : 0)}">0/0</p>
             </div>
-            <span th:if="${list.completed}" class="bg-green-100 text-green-700 px-3 py-1.5 rounded-full font-medium">
-                ✓ All done!
-            </span>
+            <span th:if="${list.completed}" class="bg-green-100 text-green-700 px-3 py-1.5 rounded-full font-medium"
+                  th:text="#{shopping.detail.alldone}">✓ All done!</span>
         </div>
 
         <!-- Progress bar -->
@@ -35,7 +33,7 @@
              class="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-center space-x-2">
             <span class="text-green-600">🏷️</span>
             <span class="text-green-700 text-sm font-medium"
-                  th:text="${list.saleItemCount + ' items are currently on sale at your selected stores!'}">Items on sale!</span>
+                  th:text="${list.saleItemCount + ' ' + #{shopping.detail.onsale}}">Items on sale!</span>
         </div>
 
         <!-- Items grouped by category -->
@@ -47,7 +45,7 @@
                 <th:block th:with="categoryItems=${list.items.?[#this.category == category]}">
                     <div th:if="${categoryItems != null && !categoryItems.isEmpty()}">
                         <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 px-1"
-                            th:text="${category}">Category</h3>
+                            th:text="${#messages.msg('category.' + category.toLowerCase())}">Category</h3>
                         <div class="card divide-y divide-gray-100">
                             <div th:each="item : ${categoryItems}"
                                  class="flex items-center justify-between px-5 py-4 group"
@@ -66,14 +64,14 @@
                                               th:text="${item.amount + ' ' + (item.unit ?: '')}">200 g</span>
                                         <span th:if="${item.mealName != null}"
                                               class="text-xs text-gray-400 block mt-0.5"
-                                              th:text="'For: ' + ${item.mealName}">For: Pasta</span>
+                                              th:text="#{shopping.detail.formeal} + ' ' + ${item.mealName}">For: Pasta</span>
                                     </div>
                                 </div>
                                 <div class="flex items-center space-x-2 ml-3">
                                     <span th:if="${item.onSale}"
                                           class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium flex items-center space-x-1">
                                         <span>🏷️</span>
-                                        <span th:text="${item.storeName != null ? item.storeName : 'On sale'}">On sale</span>
+                                        <span th:text="${item.storeName != null ? item.storeName : #{shopping.detail.onsale}}">On sale</span>
                                     </span>
                                 </div>
                             </div>
@@ -85,7 +83,7 @@
             <!-- Uncategorized items -->
             <th:block th:with="otherItems=${list.items.?[#this.category == null || #this.category.isEmpty()]}">
                 <div th:if="${otherItems != null && !otherItems.isEmpty()}">
-                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 px-1">Other</h3>
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 px-1" th:text="#{category.other}">Other</h3>
                     <div class="card divide-y divide-gray-100">
                         <div th:each="item : ${otherItems}"
                              class="flex items-center justify-between px-5 py-4"
@@ -109,7 +107,7 @@
         <div th:if="${list.items == null || list.items.isEmpty()}"
              class="card p-8 text-center text-gray-500">
             <div class="text-3xl mb-2">📋</div>
-            <p>No items in this list</p>
+            <p th:text="#{shopping.detail.noitems}">No items in this list</p>
         </div>
     </div>
 

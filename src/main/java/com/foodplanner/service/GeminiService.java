@@ -10,6 +10,11 @@ import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.servlet.LocaleResolver;
+
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -27,6 +32,8 @@ public class GeminiService {
 
     private static final String[] DAYS = {"MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"};
 
+    private final LocaleResolver localeResolver;
+
     /**
      * Inject ChatClient.Builder with required=false. Spring AI auto-configures
      * ChatClient.Builder after all user @Configuration classes are processed,
@@ -34,11 +41,33 @@ public class GeminiService {
      * Using @ConditionalOnBean in a user @Configuration class does NOT work because
      * that condition is evaluated before auto-configurations run.
      */
-    public GeminiService(@Autowired(required = false) ChatClient.Builder chatClientBuilder) {
+    public GeminiService(@Autowired(required = false) ChatClient.Builder chatClientBuilder,
+                         @Autowired(required = false) LocaleResolver localeResolver) {
         this.chatClient = chatClientBuilder != null ? chatClientBuilder.build() : null;
+        this.localeResolver = localeResolver;
         if (this.chatClient != null) {
             log.info("Gemini AI configured via Spring AI – AI-powered menus enabled");
         }
+    }
+
+    /**
+     * Returns a language instruction to append to AI prompts based on the current request locale.
+     * Defaults to Swedish if no request context is available.
+     */
+    private String getLanguageInstruction() {
+        try {
+            ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attrs != null && localeResolver != null) {
+                HttpServletRequest request = attrs.getRequest();
+                Locale locale = localeResolver.resolveLocale(request);
+                if ("en".equals(locale.getLanguage())) {
+                    return "Generate all meal names, descriptions, and recipe content in English.\n";
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Could not determine locale, defaulting to Swedish for AI prompts");
+        }
+        return "Generate all meal names, descriptions, and recipe content in Swedish.\n";
     }
 
     private boolean isConfigured() {
@@ -110,7 +139,7 @@ public class GeminiService {
             return meal;
         }
         String prompt = buildSingleMealPrompt(currentMealName, config, offers, feedback);
-        String response = callAi(prompt);
+        String response = callAi(prompt, config.getGeminiModel());
         return parseSingleMealResponse(response, config.getNumberOfPeople());
     }
 
@@ -137,6 +166,7 @@ public class GeminiService {
     private String buildMenuPrompt(MenuConfig config, List<StoreOffer> offers, String feedback) {
         String[] days = getConfiguredDays(config);
         StringBuilder sb = new StringBuilder();
+        sb.append(getLanguageInstruction());
         sb.append("You are a professional meal planner. Create a menu for ").append(days.length).append(" days.\n\n");
         sb.append("Configuration:\n");
         sb.append("- Number of people: ").append(config.getNumberOfPeople()).append("\n");
@@ -185,6 +215,7 @@ public class GeminiService {
 
     private String buildRecipePrompt(String mealName, MenuConfig config, List<StoreOffer> offers) {
         StringBuilder sb = new StringBuilder();
+        sb.append(getLanguageInstruction());
         sb.append("Create a detailed recipe for: ").append(mealName).append("\n\n");
         sb.append("Number of people: ").append(config.getNumberOfPeople()).append("\n");
 
@@ -220,6 +251,7 @@ public class GeminiService {
     private String buildSingleMealPrompt(String currentMealName, MenuConfig config,
                                           List<StoreOffer> offers, String feedback) {
         StringBuilder sb = new StringBuilder();
+        sb.append(getLanguageInstruction());
         sb.append("Suggest one replacement dinner meal instead of: \"").append(currentMealName).append("\"\n");
         sb.append("Number of people: ").append(config.getNumberOfPeople()).append("\n");
         if (feedback != null && !feedback.isBlank()) {
@@ -274,6 +306,7 @@ public class GeminiService {
 
     private String buildShoppingListPrompt(WeeklyMenu menu, Map<String, Recipe> recipes, List<StoreOffer> offers) {
         StringBuilder sb = new StringBuilder();
+        sb.append(getLanguageInstruction());
         sb.append("Create a consolidated shopping list for the following weekly menu.\n\n");
         sb.append("Meals this week:\n");
 

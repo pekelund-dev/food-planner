@@ -3,14 +3,14 @@
       th:replace="~{fragments/layout :: layout(~{::title}, ~{::main})}"
       lang="en">
 <head>
-    <title>Menu Settings</title>
+    <title th:text="#{menu.config.title}">Menu Settings</title>
 </head>
 <body>
 <main th:fragment="content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="max-w-3xl">
         <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900">Menu Settings</h1>
-            <p class="text-gray-500 mt-1">Configure your AI menu generation preferences</p>
+            <h1 class="text-3xl font-bold text-gray-900" th:text="#{menu.config.title}">Menu Settings</h1>
+            <p class="text-gray-500 mt-1" th:text="#{menu.config.subtitle}">Configure your AI menu generation preferences</p>
         </div>
 
         <form action="/menu/config" method="post" class="space-y-8">
@@ -19,35 +19,35 @@
             <!-- Basic Settings -->
             <div class="card p-6">
                 <h2 class="text-lg font-bold text-gray-800 mb-5 flex items-center space-x-2">
-                    <span>👥</span><span>Basic Settings</span>
+                    <span>👥</span><span th:text="#{menu.config.basic.title}">Basic Settings</span>
                 </h2>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Number of People</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2" th:text="#{menu.config.people}">Number of People</label>
                         <input type="number" name="numberOfPeople" min="1" max="20"
                                th:value="${config.numberOfPeople}"
                                class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Cuisine Preferences</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2" th:text="#{menu.config.cuisine}">Cuisine Preferences</label>
                         <input type="text" name="cuisinePreferences"
                                th:value="${config.cuisinePreferences}"
-                               placeholder="e.g. Italian, Asian, Nordic..."
+                               th:placeholder="#{menu.config.cuisine.placeholder}"
                                class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Menu Starts On</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2" th:text="#{menu.config.startday}">Menu Starts On</label>
                         <select name="startDayOfWeek"
                                 class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
                             <th:block th:each="day : ${ {'MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY'} }">
                                 <option th:value="${day}"
-                                        th:text="${#strings.capitalize(day.toLowerCase())}"
+                                        th:text="${#messages.msg('menu.config.days.' + day.toLowerCase())}"
                                         th:selected="${config.startDayOfWeek == day}">Monday</option>
                             </th:block>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Menu Spans (days)</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2" th:text="#{menu.config.spandays}">Menu Spans (days)</label>
                         <input type="number" name="menuSpanDays" min="1" max="7"
                                th:value="${config.menuSpanDays}"
                                class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
@@ -55,7 +55,7 @@
                 </div>
 
                 <div class="mt-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Dietary Preferences</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-2" th:text="#{menu.config.dietary}">Dietary Preferences</label>
                     <div class="flex flex-wrap gap-3">
                         <th:block th:each="pref : ${ {'Vegetarian', 'Vegan', 'Gluten-free', 'Dairy-free', 'Low-carb', 'High-protein', 'Mediterranean', 'Paleo'} }">
                             <label class="flex items-center space-x-2 cursor-pointer">
@@ -70,10 +70,10 @@
                 </div>
 
                 <div class="mt-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Allergies & Restrictions</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-2" th:text="#{menu.config.allergies}">Allergies &amp; Restrictions</label>
                     <input type="text" name="allergies"
                            th:value="${config.allergies != null ? config.allergies.toString().replace('[','').replace(']','') : ''}"
-                           placeholder="e.g. nuts, shellfish, eggs..."
+                           th:placeholder="#{menu.config.allergies.placeholder}"
                            class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
                 </div>
             </div>
@@ -81,7 +81,7 @@
             <!-- Meal Types -->
             <div class="card p-6">
                 <h2 class="text-lg font-bold text-gray-800 mb-5 flex items-center space-x-2">
-                    <span>🍽️</span><span>Meal Types to Plan</span>
+                    <span>🍽️</span><span th:text="#{menu.config.meals.title}">Meal Types to Plan</span>
                 </h2>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <label class="flex items-center p-4 border-2 rounded-xl cursor-pointer hover:border-primary-300 transition-colors"
@@ -91,7 +91,7 @@
                                class="w-5 h-5 accent-primary-600 mr-3">
                         <div>
                             <div class="text-xl mb-1">☀️</div>
-                            <span class="font-medium text-gray-800">Breakfast</span>
+                            <span class="font-medium text-gray-800" th:text="#{menu.config.breakfast}">Breakfast</span>
                         </div>
                     </label>
                     <label class="flex items-center p-4 border-2 rounded-xl cursor-pointer hover:border-primary-300 transition-colors"
@@ -101,7 +101,7 @@
                                class="w-5 h-5 accent-primary-600 mr-3">
                         <div>
                             <div class="text-xl mb-1">🌤️</div>
-                            <span class="font-medium text-gray-800">Lunch</span>
+                            <span class="font-medium text-gray-800" th:text="#{menu.config.lunch}">Lunch</span>
                         </div>
                     </label>
                     <label class="flex items-center p-4 border-2 rounded-xl cursor-pointer hover:border-primary-300 transition-colors"
@@ -111,7 +111,7 @@
                                class="w-5 h-5 accent-primary-600 mr-3">
                         <div>
                             <div class="text-xl mb-1">🌙</div>
-                            <span class="font-medium text-gray-800">Dinner</span>
+                            <span class="font-medium text-gray-800" th:text="#{menu.config.dinner}">Dinner</span>
                         </div>
                     </label>
                 </div>
@@ -120,13 +120,13 @@
             <!-- Budget & Offers -->
             <div class="card p-6">
                 <h2 class="text-lg font-bold text-gray-800 mb-5 flex items-center space-x-2">
-                    <span>💰</span><span>Budget &amp; Offers</span>
+                    <span>💰</span><span th:text="#{menu.config.budget.title}">Budget &amp; Offers</span>
                 </h2>
                 <div class="space-y-4">
                     <label class="flex items-center justify-between p-4 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50">
                         <div>
-                            <p class="font-medium text-gray-800">Prefer budget-friendly meals</p>
-                            <p class="text-sm text-gray-500">AI will prioritize cost-effective recipes</p>
+                            <p class="font-medium text-gray-800" th:text="#{menu.config.budget.label}">Prefer budget-friendly meals</p>
+                            <p class="text-sm text-gray-500" th:text="#{menu.config.budget.desc}">AI will prioritize cost-effective recipes</p>
                         </div>
                         <input type="checkbox" name="preferBudgetFriendly"
                                th:checked="${config.preferBudgetFriendly}"
@@ -134,8 +134,8 @@
                     </label>
                     <label class="flex items-center justify-between p-4 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50">
                         <div>
-                            <p class="font-medium text-gray-800">Use store offers in menu planning</p>
-                            <p class="text-sm text-gray-500">AI will prioritize ingredients currently on sale</p>
+                            <p class="font-medium text-gray-800" th:text="#{menu.config.offers.label}">Use store offers in menu planning</p>
+                            <p class="text-sm text-gray-500" th:text="#{menu.config.offers.desc}">AI will prioritize ingredients currently on sale</p>
                         </div>
                         <input type="checkbox" name="useStoreOffers"
                                th:checked="${config.useStoreOffers}"
@@ -144,20 +144,20 @@
                 </div>
             </div>
 
-            <!-- Your Local Stores (specific store search with HTMX autocomplete) -->
+            <!-- Your Local Stores -->
             <div class="card p-6">
                 <h2 class="text-lg font-bold text-gray-800 mb-2 flex items-center space-x-2">
-                    <span>🏪</span><span>Your Local Stores</span>
+                    <span>🏪</span><span th:text="#{menu.config.stores.title}">Your Local Stores</span>
                 </h2>
-                <p class="text-sm text-gray-500 mb-5">
-                    Search for your specific store by name (e.g. "ICA Kvantum Caroli", "Willys Lund"). The list includes 60+ named Swedish stores seeded from public store directories. If your store isn't listed, type the name and click <strong>Add store</strong> to add it yourself.
+                <p class="text-sm text-gray-500 mb-5" th:text="#{menu.config.stores.desc}">
+                    Search for your specific store by name.
                 </p>
 
                 <!-- Search input with HTMX autocomplete -->
                 <div class="relative">
                     <input type="text" id="storeSearch" name="q"
                            autocomplete="off"
-                           placeholder="Type a store name, e.g. ICA Kvantum Caroli..."
+                           th:placeholder="#{menu.config.stores.placeholder}"
                            hx-get="/stores/search"
                            hx-trigger="keyup changed delay:300ms"
                            hx-target="#store-suggestions"
@@ -186,7 +186,7 @@
                     </th:block>
                 </div>
                 <p id="no-stores-msg" th:if="${selectedStores.isEmpty()}"
-                   class="text-sm text-gray-400 mt-3 italic">No stores selected yet.</p>
+                   class="text-sm text-gray-400 mt-3 italic" th:text="#{menu.config.stores.none}">No stores selected yet.</p>
 
                 <script>
                     function addStoreEl(el) {
@@ -238,10 +238,10 @@
             <!-- AI Model -->
             <div class="card p-6">
                 <h2 class="text-lg font-bold text-gray-800 mb-5 flex items-center space-x-2">
-                    <span>🤖</span><span>AI Model</span>
+                    <span>🤖</span><span th:text="#{menu.config.ai.title}">AI Model</span>
                 </h2>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Gemini Model</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-2" th:text="#{menu.config.ai.model}">Gemini Model</label>
                     <select name="geminiModel"
                             class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white">
                         <option value="gemini-2.5-flash-lite"
@@ -249,29 +249,29 @@
                         <option value="gemini-2.5-flash"
                                 th:selected="${config.geminiModel == 'gemini-2.5-flash'}">Gemini 2.5 Flash</option>
                     </select>
-                    <p class="text-xs text-gray-500 mt-2">Select the Gemini model used for AI menu and recipe generation.</p>
+                    <p class="text-xs text-gray-500 mt-2" th:text="#{menu.config.ai.desc}">Select the Gemini model used for AI menu and recipe generation.</p>
                 </div>
             </div>
 
             <!-- Additional Instructions -->
             <div class="card p-6">
                 <h2 class="text-lg font-bold text-gray-800 mb-5 flex items-center space-x-2">
-                    <span>📝</span><span>Additional Instructions for AI</span>
+                    <span>📝</span><span th:text="#{menu.config.instructions.title}">Additional Instructions for AI</span>
                 </h2>
                 <textarea name="additionalInstructions"
                           rows="4"
                           th:text="${config.additionalInstructions}"
-                          placeholder="e.g. I love spicy food, prefer meals that can be prepared in under 30 minutes, include one vegetarian meal per week..."
+                          th:placeholder="#{menu.config.instructions.placeholder}"
                           class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none resize-none"></textarea>
-                <p class="text-xs text-gray-500 mt-2">These instructions will be sent to Gemini AI when generating your menu.</p>
+                <p class="text-xs text-gray-500 mt-2" th:text="#{menu.config.instructions.desc}">These instructions will be sent to Gemini AI when generating your menu.</p>
             </div>
 
             <!-- Save Button -->
             <div class="flex justify-end space-x-3">
-                <a href="/dashboard" class="btn-secondary">Cancel</a>
+                <a href="/dashboard" class="btn-secondary" th:text="#{menu.config.cancel}">Cancel</a>
                 <button type="submit" class="btn-primary flex items-center space-x-2">
                     <span>💾</span>
-                    <span>Save Settings</span>
+                    <span th:text="#{menu.config.save}">Save Settings</span>
                 </button>
             </div>
         </form>

@@ -3,17 +3,17 @@
       th:replace="~{fragments/layout :: layout(~{::title}, ~{::main})}"
       lang="en">
 <head>
-    <title>Store Offers</title>
+    <title th:text="#{stores.title}">Store Offers</title>
 </head>
 <body>
 <main th:fragment="content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
         <div>
-            <h1 class="text-3xl font-bold text-gray-900">Store Offers</h1>
-            <p class="text-gray-500 mt-1">Current deals at your selected stores</p>
+            <h1 class="text-3xl font-bold text-gray-900" th:text="#{stores.title}">Store Offers</h1>
+            <p class="text-gray-500 mt-1" th:text="#{stores.subtitle}">Current deals at your selected stores</p>
         </div>
         <a href="/menu/config" class="btn-secondary flex items-center space-x-2">
-            <span>⚙️</span><span>Configure Stores</span>
+            <span>⚙️</span><span th:text="#{stores.config}">Configure Stores</span>
         </a>
     </div>
 
@@ -21,16 +21,16 @@
     <div th:if="${!#lists.isEmpty(selectedStores)}"
          class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 flex items-center space-x-2">
         <span>ℹ️</span>
-        <span>Offers are fetched from each store's website. Click <strong>Refresh</strong> on a store to get the latest deals.</span>
+        <span th:text="#{stores.info}">Offers are fetched from each store's website.</span>
     </div>
 
     <!-- No stores selected -->
     <div th:if="${#lists.isEmpty(selectedStores)}" class="card p-12 text-center">
         <div class="text-6xl mb-4">🏪</div>
-        <h2 class="text-xl font-bold text-gray-700 mb-2">No stores selected</h2>
-        <p class="text-gray-500 mb-6">Search for your local store in Menu Settings to see current offers</p>
+        <h2 class="text-xl font-bold text-gray-700 mb-2" th:text="#{stores.empty.title}">No stores selected</h2>
+        <p class="text-gray-500 mb-6" th:text="#{stores.empty.desc}">Search for your local store in Menu Settings to see current offers</p>
         <a href="/menu/config" class="btn-primary inline-flex items-center space-x-2">
-            <span>⚙️</span><span>Go to Settings</span>
+            <span>⚙️</span><span th:text="#{stores.empty.button}">Go to Settings</span>
         </a>
     </div>
 
@@ -50,7 +50,7 @@
                         hx-on::after-request="window.location.reload()"
                         class="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center space-x-1 ml-2 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
                     <span th:id="'spin-' + ${store.id}" class="htmx-indicator">⏳</span>
-                    <span>🔄 Refresh</span>
+                    <span th:text="#{stores.refresh}">🔄 Refresh</span>
                 </button>
             </div>
         </div>
@@ -58,14 +58,14 @@
         <!-- No offers state -->
         <div th:if="${#lists.isEmpty(offers)}" class="card p-8 text-center">
             <div class="text-5xl mb-4">🏷️</div>
-            <h3 class="text-lg font-bold text-gray-700 mb-2">No offers loaded yet</h3>
-            <p class="text-gray-500 mb-4">Offers are refreshed automatically every Monday.</p>
-            <p class="text-sm text-gray-400">Store offer APIs may require additional configuration.</p>
+            <h3 class="text-lg font-bold text-gray-700 mb-2" th:text="#{stores.nooffers.title}">No offers loaded yet</h3>
+            <p class="text-gray-500 mb-4" th:text="#{stores.nooffers.desc}">Offers are refreshed automatically every Monday.</p>
+            <p class="text-sm text-gray-400" th:text="#{stores.nooffers.note}">Store offer APIs may require additional configuration.</p>
         </div>
 
         <!-- Offers grid -->
         <div th:if="${!#lists.isEmpty(offers)}">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">Current Offers</h2>
+            <h2 class="text-xl font-bold text-gray-800 mb-4" th:text="#{stores.offers.title}">Current Offers</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 <div th:each="offer : ${offers}"
                      class="card p-4 hover:shadow-md transition-shadow">
@@ -88,7 +88,7 @@
                     </div>
                     <p th:if="${offer.validTo != null}"
                        class="text-xs text-gray-400 mt-2"
-                       th:text="'Valid until: ' + ${#temporals.format(offer.validTo, 'MMM d')}">Valid until: Jan 7</p>
+                       th:text="#{stores.offers.validuntil} + ' ' + ${#temporals.format(offer.validTo, 'MMM d')}">Valid until: Jan 7</p>
                 </div>
             </div>
         </div>
