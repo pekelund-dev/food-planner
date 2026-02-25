@@ -275,16 +275,20 @@ public class StoreOfferService {
     }
 
     /**
-     * Refresh offers for all enabled stores. Runs weekly on Mondays at 06:00.
+     * Refresh offers for all known stores that have a public offer page URL.
+     * Runs weekly on Mondays at 06:00. Uses the Playwright + AI approach for each
+     * store so that no internal/private store APIs are called.
      */
     @Scheduled(cron = "0 0 6 * * MON")
     public void refreshAllOffers() {
         log.info("Refreshing store offers...");
-        for (String storeId : AVAILABLE_STORES.keySet()) {
-            try {
-                fetchAndSaveOffersForStore(storeId);
-            } catch (Exception e) {
-                log.error("Failed to refresh offers for store {}", storeId, e);
+        for (Store store : KNOWN_STORES) {
+            if (store.getOffersUrl() != null && !store.getOffersUrl().isBlank()) {
+                try {
+                    refreshOffersForSpecificStore(store);
+                } catch (Exception e) {
+                    log.error("Failed to refresh offers for store {}", store.getName(), e);
+                }
             }
         }
     }
@@ -424,15 +428,19 @@ public class StoreOfferService {
 
     private List<StoreOffer> fetchIcaOffers() {
         if (!icaEnabled) return List.of();
-        try {
-            // ICA has a public API for store offers
-            String url = "https://www.ica.se/api/offers/v2/store-offers";
-            ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
-            return parseIcaResponse(response.getBody());
-        } catch (Exception e) {
-            log.warn("Failed to fetch ICA offers: {}", e.getMessage());
-            return List.of();
+        // Fetch offers for each known ICA store via Playwright so no internal/private
+        // ICA API endpoints are called.
+        List<StoreOffer> allOffers = new ArrayList<>();
+        for (Store store : KNOWN_STORES) {
+            if ("ica".equals(store.getChain()) && store.getOffersUrl() != null && !store.getOffersUrl().isBlank()) {
+                try {
+                    allOffers.addAll(fetchOffersViaPlaywright(store));
+                } catch (Exception e) {
+                    log.warn("Failed to fetch offers for ICA store '{}': {}", store.getName(), e.getMessage());
+                }
+            }
         }
+        return allOffers;
     }
 
     private List<StoreOffer> fetchWillysOffers() {
@@ -462,37 +470,6 @@ public class StoreOfferService {
     private List<StoreOffer> fetchGenericOffers(String storeId) {
         log.debug("No specific implementation for store: {}", storeId);
         return List.of();
-    }
-
-    private List<StoreOffer> parseIcaResponse(String json) {
-        List<StoreOffer> offers = new ArrayList<>();
-        try {
-            JsonNode root = objectMapper.readTree(json);
-            JsonNode offersNode = root.path("offers");
-            if (offersNode.isArray()) {
-                for (JsonNode offerNode : offersNode) {
-                    StoreOffer offer = new StoreOffer();
-                    offer.setStoreId("ica");
-                    offer.setStoreName("ICA");
-                    offer.setProductName(offerNode.path("name").asText());
-                    offer.setOriginalPrice(offerNode.path("originalPrice").asDouble(0));
-                    offer.setSalePrice(offerNode.path("price").asDouble(0));
-                    offer.setProductCategory(offerNode.path("category").asText("Other"));
-                    offer.setFetchedAt(Instant.now());
-                    offer.setValidFrom(LocalDate.now());
-                    offer.setValidTo(LocalDate.now().plusDays(7));
-                    if (offer.getOriginalPrice() > 0 && offer.getSalePrice() > 0) {
-                        double discount = ((offer.getOriginalPrice() - offer.getSalePrice())
-                                / offer.getOriginalPrice()) * 100;
-                        offer.setDiscountPercent(discount);
-                    }
-                    offers.add(offer);
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Failed to parse ICA response", e);
-        }
-        return offers;
     }
 
     private List<StoreOffer> parseWillysResponse(String json) {
