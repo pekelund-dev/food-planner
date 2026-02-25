@@ -15,6 +15,8 @@ public class MenuConfig {
     private String additionalInstructions;
     private boolean preferBudgetFriendly = true;
     private boolean useStoreOffers = true;
+    private String startDayOfWeek = "MONDAY";
+    private int menuSpanDays = 7;
 
     public MenuConfig() {}
 
@@ -50,4 +52,10 @@ public class MenuConfig {
 
     public boolean isUseStoreOffers() { return useStoreOffers; }
     public void setUseStoreOffers(boolean useStoreOffers) { this.useStoreOffers = useStoreOffers; }
+
+    public String getStartDayOfWeek() { return startDayOfWeek; }
+    public void setStartDayOfWeek(String startDayOfWeek) { this.startDayOfWeek = startDayOfWeek; }
+
+    public int getMenuSpanDays() { return menuSpanDays; }
+    public void setMenuSpanDays(int menuSpanDays) { this.menuSpanDays = menuSpanDays; }
 }

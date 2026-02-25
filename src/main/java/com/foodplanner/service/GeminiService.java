@@ -49,12 +49,19 @@ public class GeminiService {
      * Generate a weekly menu using Gemini AI via Spring AI.
      */
     public WeeklyMenu generateWeeklyMenu(String userId, MenuConfig config, List<StoreOffer> currentOffers) {
+        return generateWeeklyMenu(userId, config, currentOffers, null);
+    }
+
+    /**
+     * Generate a weekly menu using Gemini AI via Spring AI, with optional feedback on a previous menu.
+     */
+    public WeeklyMenu generateWeeklyMenu(String userId, MenuConfig config, List<StoreOffer> currentOffers, String feedback) {
         if (!isConfigured()) {
             log.warn("Gemini AI not configured – set GEMINI_API_KEY env var (get key at https://aistudio.google.com/app/apikey) – returning sample menu");
             return buildSampleMenu(userId, config);
         }
 
-        String prompt = buildMenuPrompt(config, currentOffers);
+        String prompt = buildMenuPrompt(config, currentOffers, feedback);
         String response = callAi(prompt);
         return parseMenuResponse(userId, response, config);
     }
@@ -89,6 +96,24 @@ public class GeminiService {
     }
 
     /**
+     * Generate a single replacement meal with optional user feedback.
+     */
+    public WeeklyMenu.PlannedMeal regenerateSingleMeal(String currentMealName, MenuConfig config,
+                                                        List<StoreOffer> offers, String feedback) {
+        if (!isConfigured()) {
+            WeeklyMenu.PlannedMeal meal = new WeeklyMenu.PlannedMeal();
+            meal.setMealName("Replacement Dish");
+            meal.setDescription("A sample replacement dish");
+            meal.setEstimatedCost(75.0);
+            meal.setServings(config.getNumberOfPeople());
+            return meal;
+        }
+        String prompt = buildSingleMealPrompt(currentMealName, config, offers, feedback);
+        String response = callAi(prompt);
+        return parseSingleMealResponse(response, config.getNumberOfPeople());
+    }
+
+    /**
      * Invoke the Spring AI ChatClient and return the raw text response.
      */
     private String callAi(String prompt) {
@@ -104,8 +129,13 @@ public class GeminiService {
     }
 
     private String buildMenuPrompt(MenuConfig config, List<StoreOffer> offers) {
+        return buildMenuPrompt(config, offers, null);
+    }
+
+    private String buildMenuPrompt(MenuConfig config, List<StoreOffer> offers, String feedback) {
+        String[] days = getConfiguredDays(config);
         StringBuilder sb = new StringBuilder();
-        sb.append("You are a professional meal planner. Create a weekly dinner menu for 7 days.\n\n");
+        sb.append("You are a professional meal planner. Create a menu for ").append(days.length).append(" days.\n\n");
         sb.append("Configuration:\n");
         sb.append("- Number of people: ").append(config.getNumberOfPeople()).append("\n");
 
@@ -124,6 +154,10 @@ public class GeminiService {
         if (config.isPreferBudgetFriendly()) {
             sb.append("- Prefer budget-friendly meals\n");
         }
+        if (feedback != null && !feedback.isBlank()) {
+            sb.append("- User feedback on previous menu: ").append(feedback).append("\n");
+            sb.append("  Please generate a completely different menu based on this feedback.\n");
+        }
 
         if (!offers.isEmpty()) {
             sb.append("\nCurrent store offers (try to use these ingredients to save money):\n");
@@ -135,17 +169,13 @@ public class GeminiService {
         }
 
         sb.append("\nReturn a JSON object with this exact structure:\n");
-        sb.append("{\n");
-        sb.append("  \"days\": {\n");
-        sb.append("    \"MONDAY\": {\"dinner\": [{\"mealName\": \"string\", \"description\": \"string\", \"estimatedCost\": number}]},\n");
-        sb.append("    \"TUESDAY\": {\"dinner\": [{\"mealName\": \"string\", \"description\": \"string\", \"estimatedCost\": number}]},\n");
-        sb.append("    \"WEDNESDAY\": {\"dinner\": [{\"mealName\": \"string\", \"description\": \"string\", \"estimatedCost\": number}]},\n");
-        sb.append("    \"THURSDAY\": {\"dinner\": [{\"mealName\": \"string\", \"description\": \"string\", \"estimatedCost\": number}]},\n");
-        sb.append("    \"FRIDAY\": {\"dinner\": [{\"mealName\": \"string\", \"description\": \"string\", \"estimatedCost\": number}]},\n");
-        sb.append("    \"SATURDAY\": {\"dinner\": [{\"mealName\": \"string\", \"description\": \"string\", \"estimatedCost\": number}]},\n");
-        sb.append("    \"SUNDAY\": {\"dinner\": [{\"mealName\": \"string\", \"description\": \"string\", \"estimatedCost\": number}]}\n");
-        sb.append("  }\n");
-        sb.append("}\n");
+        sb.append("{\n  \"days\": {\n");
+        for (int i = 0; i < days.length; i++) {
+            sb.append("    \"").append(days[i]).append("\": {\"dinner\": [{\"mealName\": \"string\", \"description\": \"string\", \"estimatedCost\": number}]}");
+            if (i < days.length - 1) sb.append(",");
+            sb.append("\n");
+        }
+        sb.append("  }\n}\n");
         sb.append("Respond with valid JSON only, no markdown fences.");
 
         return sb.toString();
@@ -183,6 +213,61 @@ public class GeminiService {
         sb.append("Respond with valid JSON only, no markdown fences.");
 
         return sb.toString();
+    }
+
+    private String buildSingleMealPrompt(String currentMealName, MenuConfig config,
+                                          List<StoreOffer> offers, String feedback) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Suggest one replacement dinner meal instead of: \"").append(currentMealName).append("\"\n");
+        sb.append("Number of people: ").append(config.getNumberOfPeople()).append("\n");
+        if (feedback != null && !feedback.isBlank()) {
+            sb.append("Reason for replacement / feedback: ").append(feedback).append("\n");
+        }
+        if (config.getDietaryPreferences() != null && !config.getDietaryPreferences().isEmpty()) {
+            sb.append("Dietary preferences: ").append(String.join(", ", config.getDietaryPreferences())).append("\n");
+        }
+        if (!offers.isEmpty()) {
+            sb.append("Ingredients on sale you may use: ");
+            for (int i = 0; i < Math.min(10, offers.size()); i++) {
+                if (i > 0) sb.append(", ");
+                sb.append(offers.get(i).getProductName());
+            }
+            sb.append("\n");
+        }
+        sb.append("\nReturn JSON only: {\"mealName\": \"string\", \"description\": \"string\", \"estimatedCost\": number}\n");
+        sb.append("Respond with valid JSON only, no markdown fences.");
+        return sb.toString();
+    }
+
+    private WeeklyMenu.PlannedMeal parseSingleMealResponse(String response, int servings) {
+        WeeklyMenu.PlannedMeal meal = new WeeklyMenu.PlannedMeal();
+        meal.setServings(servings);
+        try {
+            String json = stripMarkdownFences(response);
+            JsonNode root = objectMapper.readTree(json);
+            meal.setMealName(root.path("mealName").asText("New Dish"));
+            meal.setDescription(root.path("description").asText(""));
+            meal.setEstimatedCost(root.path("estimatedCost").asDouble(0));
+        } catch (Exception e) {
+            log.error("Failed to parse single meal response", e);
+            meal.setMealName("Replacement Dish");
+        }
+        return meal;
+    }
+
+    private String[] getConfiguredDays(MenuConfig config) {
+        if (config == null) return DAYS.clone();
+        String start = config.getStartDayOfWeek() != null ? config.getStartDayOfWeek().toUpperCase() : "MONDAY";
+        int span = config.getMenuSpanDays() > 0 ? Math.min(config.getMenuSpanDays(), 7) : 7;
+        int startIdx = 0;
+        for (int i = 0; i < DAYS.length; i++) {
+            if (DAYS[i].equals(start)) { startIdx = i; break; }
+        }
+        String[] result = new String[span];
+        for (int i = 0; i < span; i++) {
+            result[i] = DAYS[(startIdx + i) % 7];
+        }
+        return result;
     }
 
     private String buildShoppingListPrompt(WeeklyMenu menu, Map<String, Recipe> recipes, List<StoreOffer> offers) {
@@ -243,13 +328,14 @@ public class GeminiService {
 
             Map<String, WeeklyMenu.DayMenu> days = new LinkedHashMap<>();
             JsonNode daysNode = root.path("days");
+            int servings = config.getNumberOfPeople();
             for (String day : DAYS) {
                 JsonNode dayNode = daysNode.path(day);
                 WeeklyMenu.DayMenu dayMenu = new WeeklyMenu.DayMenu();
                 if (!dayNode.isMissingNode()) {
-                    dayMenu.setDinner(parsePlannedMeals(dayNode.path("dinner")));
-                    dayMenu.setLunch(parsePlannedMeals(dayNode.path("lunch")));
-                    dayMenu.setBreakfast(parsePlannedMeals(dayNode.path("breakfast")));
+                    dayMenu.setDinner(parsePlannedMeals(dayNode.path("dinner"), servings));
+                    dayMenu.setLunch(parsePlannedMeals(dayNode.path("lunch"), servings));
+                    dayMenu.setBreakfast(parsePlannedMeals(dayNode.path("breakfast"), servings));
                 }
                 days.put(day, dayMenu);
             }
@@ -261,14 +347,15 @@ public class GeminiService {
         }
     }
 
-    private List<WeeklyMenu.PlannedMeal> parsePlannedMeals(JsonNode mealsNode) {
+    private List<WeeklyMenu.PlannedMeal> parsePlannedMeals(JsonNode mealsNode, int servings) {
         List<WeeklyMenu.PlannedMeal> meals = new ArrayList<>();
         if (mealsNode.isArray()) {
             for (JsonNode mealNode : mealsNode) {
                 WeeklyMenu.PlannedMeal meal = new WeeklyMenu.PlannedMeal();
                 meal.setMealName(mealNode.path("mealName").asText("Unknown meal"));
+                meal.setDescription(mealNode.path("description").asText(""));
                 meal.setEstimatedCost(mealNode.path("estimatedCost").asDouble(0));
-                meal.setServings(2);
+                meal.setServings(servings);
                 meals.add(meal);
             }
         }

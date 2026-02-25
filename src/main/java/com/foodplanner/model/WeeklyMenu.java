@@ -37,6 +37,7 @@ public class WeeklyMenu {
     public static class PlannedMeal {
         private String mealId;
         private String mealName;
+        private String description;
         private String recipeId;
         private int servings;
         private boolean completed;
@@ -49,6 +50,9 @@ public class WeeklyMenu {
 
         public String getMealName() { return mealName; }
         public void setMealName(String mealName) { this.mealName = mealName; }
+
+        public String getDescription() { return description; }
+        public void setDescription(String description) { this.description = description; }
 
         public String getRecipeId() { return recipeId; }
         public void setRecipeId(String recipeId) { this.recipeId = recipeId; }
