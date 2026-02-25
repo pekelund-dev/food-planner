@@ -11,7 +11,8 @@
     <!-- Welcome Header -->
     <div class="mb-8">
         <h1 class="text-3xl font-bold text-gray-900">
-            <span th:text="${#dates.format(#dates.createNow(), 'HH') lt '12' ? #{dashboard.greeting.morning} : (#dates.format(#dates.createNow(), 'HH') lt '17' ? #{dashboard.greeting.afternoon} : #{dashboard.greeting.evening})}">Hej</span>,
+            <span th:with="h=${T(java.time.LocalTime).now().hour}"
+                  th:text="${h < 12 ? #messages.msg('dashboard.greeting.morning') : (h < 17 ? #messages.msg('dashboard.greeting.afternoon') : #messages.msg('dashboard.greeting.evening'))}">Hej</span>,
             <span th:text="${user?.name?.split(' ')[0] ?: 'there'}">User</span>! 👋
         </h1>
         <p class="text-gray-500 mt-1" th:text="#{dashboard.subtitle}">Here's your food planning overview</p>
