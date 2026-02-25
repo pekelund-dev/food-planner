@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign In – Food Planner</title>
+    <title th:text="#{login.title}">Sign In – Food Planner</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -19,17 +19,23 @@
 </head>
 <body class="min-h-screen bg-gradient-to-br from-primary-50 via-white to-green-50 flex items-center justify-center px-4">
     <div class="max-w-md w-full">
+        <!-- Language switcher -->
+        <div class="flex justify-end mb-4 space-x-2 text-xl">
+            <a th:href="'?lang=sv'" title="Svenska"
+               th:class="${#locale.language == 'sv'} ? 'opacity-100' : 'opacity-40 hover:opacity-80'">🇸🇪</a>
+            <a th:href="'?lang=en'" title="English"
+               th:class="${#locale.language != 'sv'} ? 'opacity-100' : 'opacity-40 hover:opacity-80'">🇬🇧</a>
+        </div>
         <!-- Card -->
         <div class="bg-white rounded-3xl shadow-xl p-10 text-center border border-gray-100">
             <!-- Logo -->
             <div class="text-5xl mb-4">🥗</div>
-            <h1 class="text-3xl font-bold text-gray-900 mb-2">Food Planner</h1>
-            <p class="text-gray-500 mb-8">Sign in to start planning your meals with AI</p>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2" th:text="#{nav.brand}">Food Planner</h1>
+            <p class="text-gray-500 mb-8" th:text="#{login.subtitle}">Sign in to start planning your meals with AI</p>
 
             <!-- Error message -->
-            <div th:if="${param.error}" class="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 mb-6 text-sm">
-                Sign in failed. Please try again.
-            </div>
+            <div th:if="${param.error}" class="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 mb-6 text-sm"
+                 th:text="#{login.error}">Sign in failed. Please try again.</div>
 
             <!-- Google Sign In -->
             <a href="/oauth2/authorization/google"
@@ -40,18 +46,17 @@
                     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                 </svg>
-                <span>Continue with Google</span>
+                <span th:text="#{login.google}">Continue with Google</span>
             </a>
 
-            <p class="text-xs text-gray-400 mt-8">
+            <p class="text-xs text-gray-400 mt-8" th:text="#{login.legal}">
                 By signing in, you agree to use this app for personal meal planning.
-                Your data is stored securely in Firebase.
             </p>
         </div>
 
         <!-- Back link -->
         <div class="text-center mt-6">
-            <a href="/" class="text-gray-500 hover:text-gray-700 text-sm">← Back to home</a>
+            <a href="/" class="text-gray-500 hover:text-gray-700 text-sm" th:text="#{login.back}">← Back to home</a>
         </div>
     </div>
 </body>

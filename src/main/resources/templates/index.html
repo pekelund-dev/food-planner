@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Food Planner – Smart AI Meal Planning</title>
+    <title th:text="#{index.title}">Food Planner</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -24,31 +24,36 @@
     <nav class="px-6 py-4 flex justify-between items-center max-w-7xl mx-auto w-full">
         <div class="flex items-center space-x-2">
             <span class="text-3xl">🥗</span>
-            <span class="text-xl font-bold text-gray-800">Food Planner</span>
+            <span class="text-xl font-bold text-gray-800" th:text="#{nav.brand}">Food Planner</span>
         </div>
-        <a href="/login" class="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-6 rounded-full transition-colors">
-            Get Started
-        </a>
+        <div class="flex items-center space-x-3">
+            <!-- Language switcher -->
+            <div class="flex items-center space-x-1 text-lg">
+                <a th:href="'?lang=sv'" title="Svenska"
+                   th:class="${#locale.language == 'sv'} ? 'opacity-100' : 'opacity-40 hover:opacity-80'">🇸🇪</a>
+                <a th:href="'?lang=en'" title="English"
+                   th:class="${#locale.language != 'sv'} ? 'opacity-100' : 'opacity-40 hover:opacity-80'">🇬🇧</a>
+            </div>
+            <a href="/login" class="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-6 rounded-full transition-colors"
+               th:text="#{index.getstarted}">Get Started</a>
+        </div>
     </nav>
 
     <main class="flex-1 flex flex-col items-center justify-center px-6 text-center pb-16">
         <div class="max-w-4xl">
             <div class="text-6xl mb-6">🤖🥗</div>
             <h1 class="text-5xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
-                Smart Meal Planning<br>
-                <span class="text-primary-600">Powered by AI</span>
+                <span th:text="#{index.hero.title1}">Smart Meal Planning</span><br>
+                <span class="text-primary-600" th:text="#{index.hero.title2}">Powered by AI</span>
             </h1>
-            <p class="text-xl text-gray-600 mb-10 max-w-2xl mx-auto">
-                Let Gemini AI plan your weekly meals, generate recipes, create shopping lists,
-                and find the best deals at your local grocery stores.
+            <p class="text-xl text-gray-600 mb-10 max-w-2xl mx-auto" th:text="#{index.hero.subtitle}">
+                Let Gemini AI plan your weekly meals.
             </p>
             <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="/login" class="bg-primary-600 hover:bg-primary-700 text-white font-bold py-4 px-8 rounded-2xl text-lg transition-colors shadow-lg">
-                    Start Planning Free
-                </a>
-                <a href="#features" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-4 px-8 rounded-2xl text-lg transition-colors">
-                    Learn More
-                </a>
+                <a href="/login" class="bg-primary-600 hover:bg-primary-700 text-white font-bold py-4 px-8 rounded-2xl text-lg transition-colors shadow-lg"
+                   th:text="#{index.hero.start}">Start Planning Free</a>
+                <a href="#features" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-4 px-8 rounded-2xl text-lg transition-colors"
+                   th:text="#{index.hero.learnmore}">Learn More</a>
             </div>
         </div>
     </main>
@@ -57,39 +62,39 @@
 <!-- Features Section -->
 <section id="features" class="py-20 bg-gray-50">
     <div class="max-w-7xl mx-auto px-6">
-        <h2 class="text-4xl font-bold text-center text-gray-900 mb-4">Everything you need</h2>
-        <p class="text-center text-gray-600 mb-16 text-lg">One app to plan, cook, and shop smarter</p>
+        <h2 class="text-4xl font-bold text-center text-gray-900 mb-4" th:text="#{index.features.title}">Everything you need</h2>
+        <p class="text-center text-gray-600 mb-16 text-lg" th:text="#{index.features.subtitle}">One app to plan, cook, and shop smarter</p>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
                 <div class="text-4xl mb-4">🤖</div>
-                <h3 class="text-xl font-bold text-gray-800 mb-3">AI Menu Generation</h3>
-                <p class="text-gray-600">Let Gemini AI create personalized weekly menus based on your preferences, dietary needs, and budget.</p>
+                <h3 class="text-xl font-bold text-gray-800 mb-3" th:text="#{index.features.ai.title}">AI Menu Generation</h3>
+                <p class="text-gray-600" th:text="#{index.features.ai.desc}">Let Gemini AI create personalized weekly menus.</p>
             </div>
             <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
                 <div class="text-4xl mb-4">📖</div>
-                <h3 class="text-xl font-bold text-gray-800 mb-3">Recipe Creation</h3>
-                <p class="text-gray-600">Automatically generate detailed recipes with ingredients, instructions, and cooking times for any meal.</p>
+                <h3 class="text-xl font-bold text-gray-800 mb-3" th:text="#{index.features.recipe.title}">Recipe Creation</h3>
+                <p class="text-gray-600" th:text="#{index.features.recipe.desc}">Automatically generate detailed recipes.</p>
             </div>
             <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
                 <div class="text-4xl mb-4">🛒</div>
-                <h3 class="text-xl font-bold text-gray-800 mb-3">Smart Shopping Lists</h3>
-                <p class="text-gray-600">Auto-generate consolidated shopping lists from your weekly menu, with quantities and categories.</p>
+                <h3 class="text-xl font-bold text-gray-800 mb-3" th:text="#{index.features.shopping.title}">Smart Shopping Lists</h3>
+                <p class="text-gray-600" th:text="#{index.features.shopping.desc}">Auto-generate consolidated shopping lists.</p>
             </div>
             <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
                 <div class="text-4xl mb-4">🏪</div>
-                <h3 class="text-xl font-bold text-gray-800 mb-3">Store Offers</h3>
-                <p class="text-gray-600">Automatically fetch current offers from your favorite grocery stores and save money every week.</p>
+                <h3 class="text-xl font-bold text-gray-800 mb-3" th:text="#{index.features.offers.title}">Store Offers</h3>
+                <p class="text-gray-600" th:text="#{index.features.offers.desc}">Automatically fetch current offers.</p>
             </div>
             <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
                 <div class="text-4xl mb-4">⭐</div>
-                <h3 class="text-xl font-bold text-gray-800 mb-3">Meal Ratings</h3>
-                <p class="text-gray-600">Rate your meals and let the AI learn your preferences to generate even better menus over time.</p>
+                <h3 class="text-xl font-bold text-gray-800 mb-3" th:text="#{index.features.ratings.title}">Meal Ratings</h3>
+                <p class="text-gray-600" th:text="#{index.features.ratings.desc}">Rate your meals and let the AI learn.</p>
             </div>
             <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
                 <div class="text-4xl mb-4">⚙️</div>
-                <h3 class="text-xl font-bold text-gray-800 mb-3">Fully Configurable</h3>
-                <p class="text-gray-600">Set dietary preferences, allergies, cuisine preferences, and custom instructions for your perfect menu.</p>
+                <h3 class="text-xl font-bold text-gray-800 mb-3" th:text="#{index.features.config.title}">Fully Configurable</h3>
+                <p class="text-gray-600" th:text="#{index.features.config.desc}">Set dietary preferences and custom instructions.</p>
             </div>
         </div>
     </div>
@@ -98,11 +103,10 @@
 <!-- CTA Section -->
 <section class="py-20 bg-primary-600">
     <div class="max-w-4xl mx-auto text-center px-6">
-        <h2 class="text-4xl font-bold text-white mb-6">Ready to eat better?</h2>
-        <p class="text-primary-100 text-xl mb-10">Sign in with Google to get started for free</p>
-        <a href="/login" class="bg-white hover:bg-gray-100 text-primary-700 font-bold py-4 px-10 rounded-2xl text-lg transition-colors shadow-xl inline-block">
-            Sign in with Google
-        </a>
+        <h2 class="text-4xl font-bold text-white mb-6" th:text="#{index.cta.title}">Ready to eat better?</h2>
+        <p class="text-primary-100 text-xl mb-10" th:text="#{index.cta.subtitle}">Sign in with Google to get started for free</p>
+        <a href="/login" class="bg-white hover:bg-gray-100 text-primary-700 font-bold py-4 px-10 rounded-2xl text-lg transition-colors shadow-xl inline-block"
+           th:text="#{index.cta.button}">Sign in with Google</a>
     </div>
 </section>
 
@@ -110,9 +114,9 @@
     <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center">
         <div class="flex items-center space-x-2 mb-4 md:mb-0">
             <span class="text-2xl">🥗</span>
-            <span class="text-white font-bold">Food Planner</span>
+            <span class="text-white font-bold" th:text="#{nav.brand}">Food Planner</span>
         </div>
-        <p class="text-sm">Powered by Google Gemini AI · Built with Spring Boot</p>
+        <p class="text-sm" th:text="#{index.footer.tagline}">Powered by Google Gemini AI</p>
     </div>
 </footer>
 </body>
