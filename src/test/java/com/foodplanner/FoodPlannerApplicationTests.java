@@ -3,9 +3,14 @@ package com.foodplanner;
 import com.foodplanner.model.MenuConfig;
 import com.foodplanner.model.Recipe;
 import com.foodplanner.model.ShoppingList;
+import com.foodplanner.model.StoreOffer;
 import com.foodplanner.model.WeeklyMenu;
 import com.foodplanner.service.MenuService;
+import com.foodplanner.service.StoreOfferService;
 import org.junit.jupiter.api.Test;
+
+import java.time.LocalDate;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -103,11 +108,236 @@ class FoodPlannerApplicationTests {
         assertNull(dayMenu.getBreakfast());
     }
 
+    // ---- ICA __INITIAL_DATA__ parsing tests ----
+
+    /** Minimal HTML snippet containing a window.__INITIAL_DATA__ script block. */
+    private static final String ICA_HTML_SNIPPET =
+        "<html><head></head><body>" +
+        "<script>window.__INITIAL_DATA__ = {" +
+        "\"offers\":{" +
+        "\"weeklyOffers\":[{" +
+        "\"id\":\"5003802339\"," +
+        "\"details\":{\"brand\":\"Kronfågel. Ursprung Sverige\",\"name\":\"Färsk kycklingfilé\"," +
+        "\"packageInformation\":\"Ca 925 g\",\"mechanicInfo\":\"109 kr/kg\",\"customerInformation\":\"Naturell\"}," +
+        "\"category\":{\"articleGroupName\":\"Kött & chark\",\"articleGroupId\":6}," +
+        "\"validTo\":\"2026-03-01T00:00:00\"," +
+        "\"parsedMechanics\":{\"quantity\":0,\"value2\":\"109\",\"value4\":\"/kg\"}," +
+        "\"stores\":[{\"regularPrice\":\"169,90\",\"referencePriceText\":\"Ord.pris 169:90 kr.\"}]," +
+        "\"eans\":[{\"image\":\"https://assets.icanet.se/image.jpg\"}]" +
+        "},{" +
+        "\"id\":\"5003802338\"," +
+        "\"details\":{\"brand\":\"Gevalia\",\"name\":\"Kaffe\"," +
+        "\"packageInformation\":\"425-450 g\",\"mechanicInfo\":\"2 för 135 kr\",\"customerInformation\":\"\"}," +
+        "\"category\":{\"articleGroupName\":\"Skafferivaror\",\"articleGroupId\":9}," +
+        "\"validTo\":\"2026-03-01T00:00:00\"," +
+        "\"parsedMechanics\":{\"quantity\":2,\"value2\":\"135\",\"value4\":\"\"}," +
+        "\"stores\":[{\"regularPrice\":\"77,90\",\"referencePriceText\":\"Ord.pris 77:90 kr.\"}]," +
+        "\"eans\":[{\"image\":\"https://assets.icanet.se/gevalia.jpg\"}]" +
+        "}]}};</script></body></html>";
+
+    @Test
+    void icaParserExtractsOffersFromHtml() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        List<StoreOffer> offers = service.parseIcaOffersFromHtml(
+                ICA_HTML_SNIPPET, "ICA Kvantum Test", "ica-test");
+        assertEquals(2, offers.size());
+    }
+
+    @Test
+    void icaParserMapsProductNameAsBrandPlusName() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        List<StoreOffer> offers = service.parseIcaOffersFromHtml(
+                ICA_HTML_SNIPPET, "ICA Kvantum Test", "ica-test");
+        assertEquals("Kronfågel. Ursprung Sverige Färsk kycklingfilé", offers.get(0).getProductName());
+        assertEquals("Gevalia Kaffe", offers.get(1).getProductName());
+    }
+
+    @Test
+    void icaParserSetsCorrectSalePriceForSimpleOffer() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        List<StoreOffer> offers = service.parseIcaOffersFromHtml(
+                ICA_HTML_SNIPPET, "ICA Kvantum Test", "ica-test");
+        // "109 kr/kg", quantity=0 → salePrice = 109
+        assertEquals(109.0, offers.get(0).getSalePrice(), 0.001);
+    }
+
+    @Test
+    void icaParserDividesTotalPriceByQuantityForMultiBuyOffer() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        List<StoreOffer> offers = service.parseIcaOffersFromHtml(
+                ICA_HTML_SNIPPET, "ICA Kvantum Test", "ica-test");
+        // "2 för 135 kr", quantity=2 → salePrice = 135/2 = 67.5
+        assertEquals(67.5, offers.get(1).getSalePrice(), 0.001);
+    }
+
+    @Test
+    void icaParserSetsOriginalPriceFromRegularPrice() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        List<StoreOffer> offers = service.parseIcaOffersFromHtml(
+                ICA_HTML_SNIPPET, "ICA Kvantum Test", "ica-test");
+        assertEquals(169.90, offers.get(0).getOriginalPrice(), 0.001);
+        assertEquals(77.90, offers.get(1).getOriginalPrice(), 0.001);
+    }
+
+    @Test
+    void icaParserSetsValidToDate() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        List<StoreOffer> offers = service.parseIcaOffersFromHtml(
+                ICA_HTML_SNIPPET, "ICA Kvantum Test", "ica-test");
+        assertEquals(LocalDate.of(2026, 3, 1), offers.get(0).getValidTo());
+    }
+
+    @Test
+    void icaParserMapsMeatCategory() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        List<StoreOffer> offers = service.parseIcaOffersFromHtml(
+                ICA_HTML_SNIPPET, "ICA Kvantum Test", "ica-test");
+        assertEquals("Kött & chark", offers.get(0).getProductCategory());
+        assertEquals("Skafferivaror", offers.get(1).getProductCategory());
+    }
+
+    @Test
+    void icaParserSetsImageUrl() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        List<StoreOffer> offers = service.parseIcaOffersFromHtml(
+                ICA_HTML_SNIPPET, "ICA Kvantum Test", "ica-test");
+        assertEquals("https://assets.icanet.se/image.jpg", offers.get(0).getImageUrl());
+    }
+
+    @Test
+    void icaParserReturnsEmptyListWhenNoMarker() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        List<StoreOffer> offers = service.parseIcaOffersFromHtml(
+                "<html><body>no data here</body></html>", "Store", "id");
+        assertTrue(offers.isEmpty());
+    }
+
+    @Test
+    void icaParserHandlesUndefinedValues() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        String htmlWithUndefined = ICA_HTML_SNIPPET.replace("\"validTo\":\"2026-03-01T00:00:00\"",
+                "\"validTo\":undefined");
+        List<StoreOffer> offers = service.parseIcaOffersFromHtml(
+                htmlWithUndefined, "ICA Kvantum Test", "ica-test");
+        // Should still parse successfully, validTo defaults to +7 days
+        assertFalse(offers.isEmpty());
+        assertNotNull(offers.get(0).getValidTo());
+    }
+
+    @Test
+    void sanitizerReplacesUndefinedWithNull() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        String result = service.sanitizeJsToJson("{\"a\":undefined,\"b\":1}");
+        assertEquals("{\"a\":null,\"b\":1}", result);
+    }
+
+    @Test
+    void sanitizerReplacesNewMapWithNull() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        String result = service.sanitizeJsToJson("{\"values\":new Map([])}");
+        assertEquals("{\"values\":null}", result);
+    }
+
+    @Test
+    void sanitizerReplacesNewSetWithNull() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        String result = service.sanitizeJsToJson("{\"values\":new Set([])}");
+        assertEquals("{\"values\":null}", result);
+    }
+
+    @Test
+    void sanitizerDoesNotMangleUndefinedInsideString() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        String result = service.sanitizeJsToJson("{\"a\":\"undefined\"}");
+        assertEquals("{\"a\":\"undefined\"}", result);
+    }
+
+    @Test
+    void sanitizerDoesNotMangleNewInsideString() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        String result = service.sanitizeJsToJson("{\"a\":\"new Map([])\"}");
+        assertEquals("{\"a\":\"new Map([])\"}", result);
+    }
+
+    @Test
+    void sanitizerHandlesStringWithParenInsideConstructorArgs() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        // A paren inside a string inside constructor args must not confuse the depth tracker
+        String result = service.sanitizeJsToJson("{\"x\":new Map([[\")\",1]])}");
+        assertEquals("{\"x\":null}", result);
+    }
+
+    @Test
+    void icaParserHandlesNewMapConstructor() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        // Simulate the real-world data that caused the parse failure
+        String htmlWithNewMap = ICA_HTML_SNIPPET.replace("\"eans\":[{\"image\":\"https://assets.icanet.se/gevalia.jpg\"}]",
+                "\"eans\":[{\"image\":\"https://assets.icanet.se/gevalia.jpg\"}],\"products\":{\"values\":new Map([]),\"products\":{}}");
+        List<StoreOffer> offers = service.parseIcaOffersFromHtml(
+                htmlWithNewMap, "ICA Kvantum Test", "ica-test");
+        // Should still parse all offers successfully
+        assertEquals(2, offers.size());
+    }
+
+    @Test
+    void icaParserHandlesPriceRange() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        String htmlWithRange = ICA_HTML_SNIPPET.replace("\"regularPrice\":\"169,90\"",
+                "\"regularPrice\":\"133,90-139,90\"");
+        List<StoreOffer> offers = service.parseIcaOffersFromHtml(
+                htmlWithRange, "ICA Kvantum Test", "ica-test");
+        // Should use first price in range
+        assertEquals(133.90, offers.get(0).getOriginalPrice(), 0.001);
+    }
+
+    @Test
+    void icaParserHandlesPercentageDiscount() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        // A 30%-off offer: benefitType="PERCOFF" and value1="30"
+        String htmlWithPct = ICA_HTML_SNIPPET.replace(
+                "\"parsedMechanics\":{\"quantity\":0,\"value2\":\"109\",\"value4\":\"/kg\"}",
+                "\"parsedMechanics\":{\"benefitType\":\"PERCOFF\",\"quantity\":0,\"value1\":\"30\",\"value2\":\"0\",\"value4\":\"\"}");
+        List<StoreOffer> offers = service.parseIcaOffersFromHtml(
+                htmlWithPct, "ICA Kvantum Test", "ica-test");
+        StoreOffer pctOffer = offers.get(0);
+        // originalPrice = 169.90, 30% off → salePrice = 169.90 * 0.70 = 118.93
+        double expectedSalePrice = 169.90 * 0.70;
+        assertEquals(169.90, pctOffer.getOriginalPrice(), 0.001);
+        assertEquals(expectedSalePrice, pctOffer.getSalePrice(), 0.01);
+        assertEquals(30.0, pctOffer.getDiscountPercent(), 0.001);
+    }
+
+    @Test
+    void icaParserHandlesPercentageDiscountViaValue4Fallback() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        // A 30%-off offer without benefitType field, using value4="%" fallback
+        String htmlWithPct = ICA_HTML_SNIPPET.replace(
+                "\"parsedMechanics\":{\"quantity\":0,\"value2\":\"109\",\"value4\":\"/kg\"}",
+                "\"parsedMechanics\":{\"quantity\":0,\"value1\":\"30\",\"value2\":\"0\",\"value4\":\"%\"}");
+        List<StoreOffer> offers = service.parseIcaOffersFromHtml(
+                htmlWithPct, "ICA Kvantum Test", "ica-test");
+        StoreOffer pctOffer = offers.get(0);
+        double expectedSalePrice = 169.90 * 0.70;
+        assertEquals(169.90, pctOffer.getOriginalPrice(), 0.001);
+        assertEquals(expectedSalePrice, pctOffer.getSalePrice(), 0.01);
+        assertEquals(30.0, pctOffer.getDiscountPercent(), 0.001);
+    }
+
     /**
      * Test helper that exposes MenuService.getMenuDays without needing Spring context.
      */
     static class MenuServiceTestHelper extends MenuService {
         MenuServiceTestHelper() {
+            super(null, null, null);
+        }
+    }
+
+    /**
+     * Test helper that exposes the package-private parseIcaOffersFromHtml method
+     * without needing a Spring context or any dependencies.
+     */
+    static class StoreOfferTestHelper extends StoreOfferService {
+        StoreOfferTestHelper() {
             super(null, null, null);
         }
     }

@@ -28,6 +28,8 @@ public class ShoppingList {
         private String storeId;
         private String storeName;
         private Double salePrice;
+        private String validUntil;   // ISO date string e.g. "2026-03-01" (LocalDate.toString()) for offer validity
+        private String offerRules;   // deal text e.g. "2 för 25 kr"
 
         public ShoppingItem() {}
 
@@ -63,6 +65,12 @@ public class ShoppingList {
 
         public Double getSalePrice() { return salePrice; }
         public void setSalePrice(Double salePrice) { this.salePrice = salePrice; }
+
+        public String getValidUntil() { return validUntil; }
+        public void setValidUntil(String validUntil) { this.validUntil = validUntil; }
+
+        public String getOfferRules() { return offerRules; }
+        public void setOfferRules(String offerRules) { this.offerRules = offerRules; }
     }
 
     public ShoppingList() {}

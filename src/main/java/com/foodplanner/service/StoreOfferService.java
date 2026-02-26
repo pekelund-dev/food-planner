@@ -8,6 +8,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -331,9 +334,11 @@ public class StoreOfferService {
 
     /**
      * Fetch real offers for a specific store by:
-     * 1. Using Playwright to navigate to the chain's offers page and capture rendered content.
-     * 2. Asking the AI to extract structured offer data from that content.
-     * Returns an empty list if Playwright cannot reach the page or AI extracts no offers.
+     * 1. For ICA stores: fetching the page HTML via HTTP GET and parsing the
+     *    {@code window.__INITIAL_DATA__} JSON embedded in a script tag directly.
+     * 2. Using Playwright to navigate to the chain's offers page and capture rendered content.
+     * 3. Asking the AI to extract structured offer data from that content.
+     * Returns an empty list if neither approach produces offers.
      */
     private List<StoreOffer> fetchOffersViaPlaywright(Store store) {
         if (geminiService == null) return List.of();
@@ -345,6 +350,17 @@ public class StoreOfferService {
         // 3. Ask Gemini to infer the URL from the store name (custom / unknown stores)
         // 4. Chain-level generic URL as last resort
         String url = resolveStoreOffersUrl(store);
+
+        // For ICA stores, try parsing window.__INITIAL_DATA__ from the page HTML first.
+        // This is faster, more reliable, and provides richer data (including validTo dates)
+        // than the Playwright + AI approach.
+        if ("ica".equals(store.getChain()) && url != null) {
+            List<StoreOffer> icaOffers = fetchIcaOffersFromPage(store, url);
+            if (!icaOffers.isEmpty()) {
+                return icaOffers;
+            }
+            log.info("ICA script-tag parsing found no offers for '{}', falling back to Playwright+AI", store.getName());
+        }
 
         if (url != null && playwrightFetchService != null) {
             String pageContent = playwrightFetchService.fetchPageContent(url);
@@ -361,6 +377,347 @@ public class StoreOfferService {
         }
 
         return List.of();
+    }
+
+    /**
+     * Fetch ICA offers by performing a plain HTTP GET on the store's offer page and
+     * extracting the {@code window.__INITIAL_DATA__} JSON blob embedded in a script tag.
+     * ICA embeds the full offer list server-side, so no JavaScript execution is needed.
+     *
+     * @param store the store to fetch offers for
+     * @param url   the store's offer page URL
+     * @return parsed offers, or an empty list on any failure
+     */
+    private List<StoreOffer> fetchIcaOffersFromPage(Store store, String url) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                    + "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+            HttpEntity<Void> request = new HttpEntity<>(headers);
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url, HttpMethod.GET, request, String.class);
+            String html = response.getBody();
+            if (html == null || html.isBlank()) {
+                log.info("Empty HTML response for ICA store '{}'", store.getName());
+                return List.of();
+            }
+            return parseIcaOffersFromHtml(html, store.getName(), store.getId());
+        } catch (Exception e) {
+            log.warn("Failed to fetch ICA page '{}' from {}: {}", store.getName(), url, e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * Extract the {@code window.__INITIAL_DATA__} JSON from the raw HTML of an ICA offers page
+     * and parse the {@code offers.weeklyOffers} array into a list of {@link StoreOffer} objects.
+     */
+    public List<StoreOffer> parseIcaOffersFromHtml(String html, String storeName, String storeId) {
+        String json = extractInitialDataJson(html);
+        if (json == null) {
+            log.info("No window.__INITIAL_DATA__ found in page for '{}'", storeName);
+            return List.of();
+        }
+        // Strip JS-only constructs (undefined, new Map([]), new Set([]), etc.) to get valid JSON
+        json = sanitizeJsToJson(json);
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            JsonNode weeklyOffers = root.path("offers").path("weeklyOffers");
+            if (!weeklyOffers.isArray() || weeklyOffers.isEmpty()) {
+                log.info("No weeklyOffers found in __INITIAL_DATA__ for '{}'", storeName);
+                return List.of();
+            }
+            List<StoreOffer> offers = mapIcaWeeklyOffers(weeklyOffers, storeName, storeId);
+            log.info("Parsed {} ICA offers from __INITIAL_DATA__ for '{}'", offers.size(), storeName);
+            return offers;
+        } catch (Exception e) {
+            log.warn("Failed to parse ICA __INITIAL_DATA__ JSON for '{}': {}", storeName, e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * Convert the JavaScript object literal used in {@code window.__INITIAL_DATA__} to valid JSON
+     * by replacing JavaScript-specific constructs that are not accepted by a JSON parser:
+     * <ul>
+     *   <li>{@code undefined} tokens → {@code null}</li>
+     *   <li>{@code new SomeConstructor(...)} calls → {@code null}
+     *       (e.g. {@code new Map([])}, {@code new Set([])})</li>
+     * </ul>
+     * String literals are skipped so that occurrences of these words inside string values
+     * are not mangled.
+     */
+    public String sanitizeJsToJson(String js) {
+        StringBuilder sb = new StringBuilder(js.length());
+        int i = 0;
+        boolean inString = false;
+        char stringChar = 0;
+        boolean escaped = false;
+
+        while (i < js.length()) {
+            char c = js.charAt(i);
+
+            // Handle escape sequences inside strings
+            if (escaped) {
+                sb.append(c);
+                escaped = false;
+                i++;
+                continue;
+            }
+            if (inString && c == '\\') {
+                sb.append(c);
+                escaped = true;
+                i++;
+                continue;
+            }
+
+            // Track string boundaries
+            if (inString) {
+                if (c == stringChar) {
+                    inString = false;
+                }
+                sb.append(c);
+                i++;
+                continue;
+            }
+
+            // Start of a string
+            if (c == '"' || c == '\'') {
+                inString = true;
+                stringChar = c;
+                sb.append(c);
+                i++;
+                continue;
+            }
+
+            // Replace bare `undefined` token with null
+            if (c == 'u' && js.startsWith("undefined", i)) {
+                // Make sure it is a standalone token (not part of an identifier)
+                int after = i + 9;
+                boolean standalone = (i == 0 || !Character.isLetterOrDigit(js.charAt(i - 1)))
+                        && (after >= js.length() || !Character.isLetterOrDigit(js.charAt(after)));
+                if (standalone) {
+                    sb.append("null");
+                    i = after;
+                    continue;
+                }
+            }
+
+            // Replace JavaScript constructor calls: new ClassName(...) → null
+            if (c == 'n' && js.startsWith("new ", i)) {
+                int j = i + 4;
+                // Skip identifier characters (letters, digits, underscores only — no dots)
+                while (j < js.length()
+                        && (Character.isLetterOrDigit(js.charAt(j)) || js.charAt(j) == '_')) {
+                    j++;
+                }
+                // Skip optional whitespace between identifier and '('
+                while (j < js.length() && js.charAt(j) == ' ') {
+                    j++;
+                }
+                if (j < js.length() && js.charAt(j) == '(') {
+                    // Walk forward, tracking parenthesis depth to find the matching ')'.
+                    // Skip string literals so that '(' or ')' inside strings is not counted.
+                    int depth = 1;
+                    int k = j + 1;
+                    boolean argInStr = false;
+                    char argStrChar = 0;
+                    boolean argEscaped = false;
+                    while (k < js.length() && depth > 0) {
+                        char ch = js.charAt(k);
+                        if (argEscaped) {
+                            argEscaped = false;
+                        } else if (argInStr && ch == '\\') {
+                            argEscaped = true;
+                        } else if (argInStr) {
+                            if (ch == argStrChar) argInStr = false;
+                        } else if (ch == '"' || ch == '\'') {
+                            argInStr = true;
+                            argStrChar = ch;
+                        } else if (ch == '(') {
+                            depth++;
+                        } else if (ch == ')') {
+                            depth--;
+                        }
+                        k++;
+                    }
+                    sb.append("null");
+                    i = k;
+                    continue;
+                }
+            }
+
+            sb.append(c);
+            i++;
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Locate the {@code window.__INITIAL_DATA__} assignment in the HTML and extract the JSON
+     * object using a brace-depth counter, which correctly handles nested structures.
+     */
+    private String extractInitialDataJson(String html) {
+        String marker = "window.__INITIAL_DATA__";
+        int markerIdx = html.indexOf(marker);
+        if (markerIdx < 0) return null;
+
+        int braceStart = html.indexOf('{', markerIdx);
+        if (braceStart < 0) return null;
+
+        int depth = 0;
+        boolean inString = false;
+        char prev = 0;
+        for (int i = braceStart; i < html.length(); i++) {
+            char c = html.charAt(i);
+            if (c == '"' && prev != '\\') {
+                inString = !inString;
+            }
+            if (!inString) {
+                if (c == '{') depth++;
+                else if (c == '}') {
+                    depth--;
+                    if (depth == 0) {
+                        return html.substring(braceStart, i + 1);
+                    }
+                }
+            }
+            prev = c;
+        }
+        return null;
+    }
+
+    /**
+     * Map a JSON array of ICA {@code weeklyOffers} nodes to {@link StoreOffer} objects.
+     */
+    private List<StoreOffer> mapIcaWeeklyOffers(JsonNode weeklyOffers, String storeName, String storeId) {
+        List<StoreOffer> offers = new ArrayList<>();
+        for (JsonNode node : weeklyOffers) {
+            try {
+                StoreOffer offer = mapIcaOfferNode(node, storeName, storeId);
+                if (offer != null && !offer.getProductName().isBlank()) {
+                    offers.add(offer);
+                }
+            } catch (Exception e) {
+                log.debug("Skipping ICA offer node due to parse error: {}", e.getMessage());
+            }
+        }
+        return offers;
+    }
+
+    /**
+     * Map a single ICA weeklyOffer JSON node to a {@link StoreOffer}.
+     */
+    private StoreOffer mapIcaOfferNode(JsonNode node, String storeName, String storeId) {
+        StoreOffer offer = new StoreOffer();
+        offer.setId(node.path("id").asText(UUID.randomUUID().toString()));
+        offer.setStoreId(storeId);
+        offer.setStoreName(storeName);
+        offer.setFetchedAt(Instant.now());
+        offer.setValidFrom(LocalDate.now());
+
+        // Product name: brand + name
+        JsonNode details = node.path("details");
+        String brand = details.path("brand").asText("").trim();
+        String name = details.path("name").asText("").trim();
+        offer.setProductName(brand.isEmpty() ? name : brand + " " + name);
+
+        // Unit from package information (e.g. "425-450 g", "Ca 925 g")
+        offer.setUnit(details.path("packageInformation").asText("").trim());
+
+        // Offer description (the mechanic text shown on the price tag, e.g. "2 för 135 kr")
+        offer.setOfferDescription(details.path("mechanicInfo").asText("").trim());
+
+        // Regular price from the store-specific price field (may be a range like "133,90-139,90")
+        // Parse this first so percentage-discount sale price can be derived from it.
+        JsonNode storesNode = node.path("stores");
+        if (storesNode.isArray() && !storesNode.isEmpty()) {
+            String regularPrice = storesNode.get(0).path("regularPrice").asText("").trim();
+            // Use the first price in case of a range
+            String firstPrice = regularPrice.split("-")[0].trim();
+            offer.setOriginalPrice(parseSwedishPrice(firstPrice));
+        }
+
+        // Sale price and discount percent from parsedMechanics.
+        // Three cases:
+        //   1. benefitType == "PERCOFF" or value4 == "%" → percentage discount: value1 is %-off,
+        //      derive salePrice from originalPrice
+        //   2. quantity >= 2 → multi-buy deal: value2 is the bundle total, divide by quantity
+        //   3. otherwise     → simple fixed sale price: value2 is the sale price directly
+        JsonNode mechanics = node.path("parsedMechanics");
+        String benefitType = mechanics.path("benefitType").asText("").trim();
+        String value4 = mechanics.path("value4").asText("").trim();
+        boolean isPercOff = "PERCOFF".equals(benefitType) || "%".equals(value4);
+        if (isPercOff) {
+            double pct = parseSwedishPrice(mechanics.path("value1").asText("0"));
+            if (pct > 0 && pct <= 100 && offer.getOriginalPrice() > 0) {
+                offer.setSalePrice(offer.getOriginalPrice() * (1.0 - pct / 100.0));
+                offer.setDiscountPercent(pct);
+            }
+        } else {
+            double value2 = parseSwedishPrice(mechanics.path("value2").asText("0"));
+            int quantity = mechanics.path("quantity").asInt(0);
+            offer.setSalePrice(quantity >= 2 ? value2 / quantity : value2);
+
+            // Derive discount percent from original vs sale price for fixed-price deals
+            if (offer.getOriginalPrice() > 0 && offer.getSalePrice() > 0
+                    && offer.getOriginalPrice() > offer.getSalePrice()) {
+                double discount = ((offer.getOriginalPrice() - offer.getSalePrice())
+                        / offer.getOriginalPrice()) * 100;
+                offer.setDiscountPercent(discount);
+            }
+        }
+
+        // Category from ICA's article group name
+        offer.setProductCategory(
+                mapIcaArticleGroup(node.path("category").path("articleGroupName").asText("")));
+
+        // Valid-to date (ISO datetime string, e.g. "2026-03-01T00:00:00")
+        String validToStr = node.path("validTo").asText("").trim();
+        if (!validToStr.isBlank()) {
+            try {
+                // Take the date portion only
+                offer.setValidTo(LocalDate.parse(validToStr.substring(0, 10)));
+            } catch (Exception ignored) {
+                offer.setValidTo(LocalDate.now().plusDays(7));
+            }
+        } else {
+            offer.setValidTo(LocalDate.now().plusDays(7));
+        }
+
+        // Image URL from the first EAN entry
+        JsonNode eans = node.path("eans");
+        if (eans.isArray() && !eans.isEmpty()) {
+            String imageUrl = eans.get(0).path("image").asText("").trim();
+            if (!imageUrl.isBlank()) {
+                offer.setImageUrl(imageUrl);
+            }
+        }
+
+        return offer;
+    }
+
+    /**
+     * Parse a Swedish-formatted price string (comma as decimal separator) to a double.
+     * Returns 0 on any parse failure.
+     */
+    private double parseSwedishPrice(String price) {
+        if (price == null || price.isBlank()) return 0;
+        try {
+            return Double.parseDouble(price.replace(",", "."));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Returns the raw Swedish ICA article group name to use as the product category.
+     * Preserves the original Swedish label so the UI shows the same terminology as ICA.
+     */
+    private String mapIcaArticleGroup(String articleGroupName) {
+        if (articleGroupName == null || articleGroupName.isBlank()) return "Övrigt";
+        return articleGroupName;
     }
 
     /**

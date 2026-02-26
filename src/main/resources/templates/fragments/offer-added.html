@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--
+  Fragment returned by POST /stores/offers/add-to-list.
+  HTMX swaps this in place of the "Add to shopping list" button.
+-->
+<span th:fragment="offerAdded"
+      class="inline-flex items-center space-x-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full px-3 py-1.5">
+    <span>✓</span>
+    <span th:text="#{stores.offers.added}">Added</span>
+</span>
+</body>
+</html>
