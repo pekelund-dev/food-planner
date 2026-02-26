@@ -116,14 +116,14 @@
                             </div>
                             <p th:if="${offer.validTo != null}"
                                class="text-xs text-gray-400 mt-2"
-                               th:text="#{stores.offers.validuntil} + ' ' + ${#temporals.format(offer.validTo, 'MMM d')}">Valid until: Jan 7</p>
+                               th:text="#{stores.offers.validuntil} + ' ' + ${#temporals.format(offer.validTo, 'd MMM')}">Valid until: Jan 7</p>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Flat name-sorted view (hidden by default) -->
-            <div id="view-flat" class="hidden">
+            <div id="view-flat" style="display:none">
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     <div th:each="offer : ${offers}"
                          class="card p-4 hover:shadow-md transition-shadow flex flex-col">
@@ -149,7 +149,7 @@
                         </div>
                         <p th:if="${offer.validTo != null}"
                            class="text-xs text-gray-400 mt-2"
-                           th:text="#{stores.offers.validuntil} + ' ' + ${#temporals.format(offer.validTo, 'MMM d')}">Valid until: Jan 7</p>
+                           th:text="#{stores.offers.validuntil} + ' ' + ${#temporals.format(offer.validTo, 'd MMM')}">Valid until: Jan 7</p>
                     </div>
                 </div>
             </div>
@@ -161,11 +161,11 @@
                 function toggleGroup(btn) {
                     const body = btn.nextElementSibling;
                     const icon = btn.querySelector('.toggle-icon');
-                    if (body.classList.contains('hidden')) {
-                        body.classList.remove('hidden');
+                    if (body.style.display === 'none') {
+                        body.style.display = '';
                         icon.textContent = '▾';
                     } else {
-                        body.classList.add('hidden');
+                        body.style.display = 'none';
                         icon.textContent = '▸';
                     }
                 }
@@ -176,13 +176,13 @@
                     const btnGroup = document.getElementById('btn-sort-group');
                     const btnName = document.getElementById('btn-sort-name');
                     if (mode === 'name') {
-                        grouped.classList.add('hidden');
-                        flat.classList.remove('hidden');
+                        grouped.style.display = 'none';
+                        flat.style.display = '';
                         btnName.className = SORT_BTN_ACTIVE;
                         btnGroup.className = SORT_BTN_INACTIVE;
                     } else {
-                        flat.classList.add('hidden');
-                        grouped.classList.remove('hidden');
+                        flat.style.display = 'none';
+                        grouped.style.display = '';
                         btnGroup.className = SORT_BTN_ACTIVE;
                         btnName.className = SORT_BTN_INACTIVE;
                     }

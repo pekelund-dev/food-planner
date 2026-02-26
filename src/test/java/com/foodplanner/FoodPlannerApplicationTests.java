@@ -192,8 +192,8 @@ class FoodPlannerApplicationTests {
         StoreOfferService service = new StoreOfferTestHelper();
         List<StoreOffer> offers = service.parseIcaOffersFromHtml(
                 ICA_HTML_SNIPPET, "ICA Kvantum Test", "ica-test");
-        assertEquals("Meat", offers.get(0).getProductCategory());
-        assertEquals("Pantry", offers.get(1).getProductCategory());
+        assertEquals("Kött & chark", offers.get(0).getProductCategory());
+        assertEquals("Skafferivaror", offers.get(1).getProductCategory());
     }
 
     @Test

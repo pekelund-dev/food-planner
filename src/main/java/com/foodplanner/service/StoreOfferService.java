@@ -696,25 +696,12 @@ public class StoreOfferService {
     }
 
     /**
-     * Map an ICA article group name (Swedish) to the standardised product category string
-     * used throughout the application.
+     * Returns the raw Swedish ICA article group name to use as the product category.
+     * Preserves the original Swedish label so the UI shows the same terminology as ICA.
      */
     private String mapIcaArticleGroup(String articleGroupName) {
-        if (articleGroupName == null) return "Other";
-        return switch (articleGroupName) {
-            case "Skafferivaror"       -> "Pantry";
-            case "Kött & chark"        -> "Meat";
-            case "Fisk & skaldjur"     -> "Fish";
-            case "Frukt & grönt"       -> "Produce";
-            case "Mejeri & ägg"        -> "Dairy";
-            case "Bröd & kaffebröd"    -> "Bakery";
-            case "Dryck"               -> "Beverages";
-            case "Glass & fryst"       -> "Frozen";
-            case "Snacks & godis"      -> "Snacks";
-            case "Hushållsartiklar"    -> "Cleaning";
-            case "Färskvaror"          -> "Dairy";
-            default                    -> "Other";
-        };
+        if (articleGroupName == null || articleGroupName.isBlank()) return "Övrigt";
+        return articleGroupName;
     }
 
     /**
