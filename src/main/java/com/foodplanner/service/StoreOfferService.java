@@ -641,12 +641,12 @@ public class StoreOfferService {
 
         // Sale price and discount percent from parsedMechanics.
         // Three cases:
-        //   1. value4 == "%" → percentage discount: value1 is the %-off, derive salePrice from originalPrice
-        //   2. quantity >= 2  → multi-buy deal: value2 is the bundle total, divide by quantity
-        //   3. otherwise      → simple fixed sale price: value2 is the sale price directly
+        //   1. benefitType == "PERCOFF" → percentage discount: value1 is the %-off, derive salePrice from originalPrice
+        //   2. quantity >= 2            → multi-buy deal: value2 is the bundle total, divide by quantity
+        //   3. otherwise                → simple fixed sale price: value2 is the sale price directly
         JsonNode mechanics = node.path("parsedMechanics");
-        String value4 = mechanics.path("value4").asText("").trim();
-        if ("%".equals(value4)) {
+        String benefitType = mechanics.path("benefitType").asText("").trim();
+        if ("PERCOFF".equals(benefitType)) {
             double pct = parseSwedishPrice(mechanics.path("value1").asText("0"));
             if (pct > 0 && pct <= 100 && offer.getOriginalPrice() > 0) {
                 offer.setSalePrice(offer.getOriginalPrice() * (1.0 - pct / 100.0));

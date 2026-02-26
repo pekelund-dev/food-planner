@@ -293,10 +293,10 @@ class FoodPlannerApplicationTests {
     @Test
     void icaParserHandlesPercentageDiscount() {
         StoreOfferService service = new StoreOfferTestHelper();
-        // A 30%-off offer: value4="%" and value1="30", value2="0"
+        // A 30%-off offer: benefitType="PERCOFF" and value1="30"
         String htmlWithPct = ICA_HTML_SNIPPET.replace(
                 "\"parsedMechanics\":{\"quantity\":0,\"value2\":\"109\",\"value4\":\"/kg\"}",
-                "\"parsedMechanics\":{\"quantity\":0,\"value1\":\"30\",\"value2\":\"0\",\"value4\":\"%\"}");
+                "\"parsedMechanics\":{\"benefitType\":\"PERCOFF\",\"quantity\":0,\"value1\":\"30\",\"value2\":\"0\",\"value4\":\"\"}");
         List<StoreOffer> offers = service.parseIcaOffersFromHtml(
                 htmlWithPct, "ICA Kvantum Test", "ica-test");
         StoreOffer pctOffer = offers.get(0);
