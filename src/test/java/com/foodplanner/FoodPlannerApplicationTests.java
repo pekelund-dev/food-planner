@@ -307,6 +307,22 @@ class FoodPlannerApplicationTests {
         assertEquals(30.0, pctOffer.getDiscountPercent(), 0.001);
     }
 
+    @Test
+    void icaParserHandlesPercentageDiscountViaValue4Fallback() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        // A 30%-off offer without benefitType field, using value4="%" fallback
+        String htmlWithPct = ICA_HTML_SNIPPET.replace(
+                "\"parsedMechanics\":{\"quantity\":0,\"value2\":\"109\",\"value4\":\"/kg\"}",
+                "\"parsedMechanics\":{\"quantity\":0,\"value1\":\"30\",\"value2\":\"0\",\"value4\":\"%\"}");
+        List<StoreOffer> offers = service.parseIcaOffersFromHtml(
+                htmlWithPct, "ICA Kvantum Test", "ica-test");
+        StoreOffer pctOffer = offers.get(0);
+        double expectedSalePrice = 169.90 * 0.70;
+        assertEquals(169.90, pctOffer.getOriginalPrice(), 0.001);
+        assertEquals(expectedSalePrice, pctOffer.getSalePrice(), 0.01);
+        assertEquals(30.0, pctOffer.getDiscountPercent(), 0.001);
+    }
+
     /**
      * Test helper that exposes MenuService.getMenuDays without needing Spring context.
      */
