@@ -87,6 +87,45 @@ public class ShoppingListService {
         return firebaseService.saveShoppingList(userId, list);
     }
 
+    public ShoppingList addOfferToShoppingList(String userId, StoreOffer offer) {
+        // Find the most recent non-completed shopping list, or create a new one
+        List<ShoppingList> lists = firebaseService.getShoppingLists(userId);
+        ShoppingList list = lists.stream()
+                .filter(l -> !l.isCompleted())
+                .findFirst()
+                .orElse(null);
+
+        if (list == null) {
+            list = new ShoppingList();
+            list.setUserId(userId);
+            list.setName("Offers");
+            list.setItems(new ArrayList<>());
+            list.setCompleted(false);
+        }
+
+        if (list.getItems() == null) {
+            list.setItems(new ArrayList<>());
+        }
+
+        // Create a shopping item from the offer
+        ShoppingList.ShoppingItem item = new ShoppingList.ShoppingItem();
+        item.setId(java.util.UUID.randomUUID().toString());
+        item.setName(offer.getProductName());
+        item.setAmount(1);
+        item.setUnit(offer.getUnit() != null ? offer.getUnit() : "");
+        item.setCategory(offer.getProductCategory());
+        item.setOnSale(true);
+        item.setStoreId(offer.getStoreId());
+        item.setStoreName(offer.getStoreName());
+        item.setSalePrice(offer.getSalePrice());
+        item.setValidUntil(offer.getValidTo() != null ? offer.getValidTo().toString() : null);
+        item.setOfferRules(offer.getOfferDescription());
+        item.setChecked(false);
+
+        list.getItems().add(item);
+        return firebaseService.saveShoppingList(userId, list);
+    }
+
     public void deleteShoppingList(String userId, String listId) {
         // Simple delete using save with empty - we'll use Firebase directly
         firebaseService.getShoppingList(userId, listId); // just verify it exists

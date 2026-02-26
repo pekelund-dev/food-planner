@@ -65,6 +65,12 @@
                                         <span th:if="${item.mealName != null}"
                                               class="text-xs text-gray-400 block mt-0.5"
                                               th:text="#{shopping.detail.formeal} + ' ' + ${item.mealName}">For: Pasta</span>
+                                        <span th:if="${item.offerRules != null and !item.offerRules.isEmpty()}"
+                                              class="text-xs font-semibold text-green-700 block mt-0.5"
+                                              th:text="${item.offerRules}">2 för 25 kr</span>
+                                        <span th:if="${item.validUntil != null and !item.validUntil.isEmpty()}"
+                                              class="text-xs text-gray-400 block mt-0.5"
+                                              th:text="#{stores.offers.validuntil} + ' ' + ${item.validUntil}">Valid until: 2026-03-01</span>
                                     </div>
                                 </div>
                                 <div class="flex items-center space-x-2 ml-3">
