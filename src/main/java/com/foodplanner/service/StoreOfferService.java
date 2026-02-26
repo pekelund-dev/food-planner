@@ -629,14 +629,8 @@ public class StoreOfferService {
         // Offer description (the mechanic text shown on the price tag, e.g. "2 för 135 kr")
         offer.setOfferDescription(details.path("mechanicInfo").asText("").trim());
 
-        // Sale price from parsedMechanics: value2 holds the numeric price; for multi-buy
-        // deals (quantity >= 2) the price is the deal total, so divide by quantity.
-        JsonNode mechanics = node.path("parsedMechanics");
-        double value2 = parseSwedishPrice(mechanics.path("value2").asText("0"));
-        int quantity = mechanics.path("quantity").asInt(0);
-        offer.setSalePrice(quantity >= 2 ? value2 / quantity : value2);
-
         // Regular price from the store-specific price field (may be a range like "133,90-139,90")
+        // Parse this first so percentage-discount sale price can be derived from it.
         JsonNode storesNode = node.path("stores");
         if (storesNode.isArray() && !storesNode.isEmpty()) {
             String regularPrice = storesNode.get(0).path("regularPrice").asText("").trim();
@@ -645,12 +639,31 @@ public class StoreOfferService {
             offer.setOriginalPrice(parseSwedishPrice(firstPrice));
         }
 
-        // Discount percent
-        if (offer.getOriginalPrice() > 0 && offer.getSalePrice() > 0
-                && offer.getOriginalPrice() > offer.getSalePrice()) {
-            double discount = ((offer.getOriginalPrice() - offer.getSalePrice())
-                    / offer.getOriginalPrice()) * 100;
-            offer.setDiscountPercent(discount);
+        // Sale price and discount percent from parsedMechanics.
+        // Three cases:
+        //   1. value4 == "%" → percentage discount: value1 is the %-off, derive salePrice from originalPrice
+        //   2. quantity >= 2  → multi-buy deal: value2 is the bundle total, divide by quantity
+        //   3. otherwise      → simple fixed sale price: value2 is the sale price directly
+        JsonNode mechanics = node.path("parsedMechanics");
+        String value4 = mechanics.path("value4").asText("").trim();
+        if ("%".equals(value4)) {
+            double pct = parseSwedishPrice(mechanics.path("value1").asText("0"));
+            if (pct > 0 && pct <= 100 && offer.getOriginalPrice() > 0) {
+                offer.setSalePrice(offer.getOriginalPrice() * (1.0 - pct / 100.0));
+                offer.setDiscountPercent(pct);
+            }
+        } else {
+            double value2 = parseSwedishPrice(mechanics.path("value2").asText("0"));
+            int quantity = mechanics.path("quantity").asInt(0);
+            offer.setSalePrice(quantity >= 2 ? value2 / quantity : value2);
+
+            // Derive discount percent from original vs sale price for fixed-price deals
+            if (offer.getOriginalPrice() > 0 && offer.getSalePrice() > 0
+                    && offer.getOriginalPrice() > offer.getSalePrice()) {
+                double discount = ((offer.getOriginalPrice() - offer.getSalePrice())
+                        / offer.getOriginalPrice()) * 100;
+                offer.setDiscountPercent(discount);
+            }
         }
 
         // Category from ICA's article group name
