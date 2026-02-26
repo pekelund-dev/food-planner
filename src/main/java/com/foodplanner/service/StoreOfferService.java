@@ -419,8 +419,8 @@ public class StoreOfferService {
             log.info("No window.__INITIAL_DATA__ found in page for '{}'", storeName);
             return List.of();
         }
-        // Replace JavaScript-only `undefined` values with null to produce valid JSON
-        json = json.replaceAll("\\bundefined\\b", "null");
+        // Strip JS-only constructs (undefined, new Map([]), new Set([]), etc.) to get valid JSON
+        json = sanitizeJsToJson(json);
         try {
             JsonNode root = objectMapper.readTree(json);
             JsonNode weeklyOffers = root.path("offers").path("weeklyOffers");
@@ -435,6 +435,123 @@ public class StoreOfferService {
             log.warn("Failed to parse ICA __INITIAL_DATA__ JSON for '{}': {}", storeName, e.getMessage());
             return List.of();
         }
+    }
+
+    /**
+     * Convert the JavaScript object literal used in {@code window.__INITIAL_DATA__} to valid JSON
+     * by replacing JavaScript-specific constructs that are not accepted by a JSON parser:
+     * <ul>
+     *   <li>{@code undefined} tokens → {@code null}</li>
+     *   <li>{@code new SomeConstructor(...)} calls → {@code null}
+     *       (e.g. {@code new Map([])}, {@code new Set([])})</li>
+     * </ul>
+     * String literals are skipped so that occurrences of these words inside string values
+     * are not mangled.
+     */
+    public String sanitizeJsToJson(String js) {
+        StringBuilder sb = new StringBuilder(js.length());
+        int i = 0;
+        boolean inString = false;
+        char stringChar = 0;
+        boolean escaped = false;
+
+        while (i < js.length()) {
+            char c = js.charAt(i);
+
+            // Handle escape sequences inside strings
+            if (escaped) {
+                sb.append(c);
+                escaped = false;
+                i++;
+                continue;
+            }
+            if (inString && c == '\\') {
+                sb.append(c);
+                escaped = true;
+                i++;
+                continue;
+            }
+
+            // Track string boundaries
+            if (inString) {
+                if (c == stringChar) {
+                    inString = false;
+                }
+                sb.append(c);
+                i++;
+                continue;
+            }
+
+            // Start of a string
+            if (c == '"' || c == '\'') {
+                inString = true;
+                stringChar = c;
+                sb.append(c);
+                i++;
+                continue;
+            }
+
+            // Replace bare `undefined` token with null
+            if (c == 'u' && js.startsWith("undefined", i)) {
+                // Make sure it is a standalone token (not part of an identifier)
+                int after = i + 9;
+                boolean standalone = (i == 0 || !Character.isLetterOrDigit(js.charAt(i - 1)))
+                        && (after >= js.length() || !Character.isLetterOrDigit(js.charAt(after)));
+                if (standalone) {
+                    sb.append("null");
+                    i = after;
+                    continue;
+                }
+            }
+
+            // Replace JavaScript constructor calls: new ClassName(...) → null
+            if (c == 'n' && js.startsWith("new ", i)) {
+                int j = i + 4;
+                // Skip identifier characters (letters, digits, underscores only — no dots)
+                while (j < js.length()
+                        && (Character.isLetterOrDigit(js.charAt(j)) || js.charAt(j) == '_')) {
+                    j++;
+                }
+                // Skip optional whitespace between identifier and '('
+                while (j < js.length() && js.charAt(j) == ' ') {
+                    j++;
+                }
+                if (j < js.length() && js.charAt(j) == '(') {
+                    // Walk forward, tracking parenthesis depth to find the matching ')'.
+                    // Skip string literals so that '(' or ')' inside strings is not counted.
+                    int depth = 1;
+                    int k = j + 1;
+                    boolean argInStr = false;
+                    char argStrChar = 0;
+                    boolean argEscaped = false;
+                    while (k < js.length() && depth > 0) {
+                        char ch = js.charAt(k);
+                        if (argEscaped) {
+                            argEscaped = false;
+                        } else if (argInStr && ch == '\\') {
+                            argEscaped = true;
+                        } else if (argInStr) {
+                            if (ch == argStrChar) argInStr = false;
+                        } else if (ch == '"' || ch == '\'') {
+                            argInStr = true;
+                            argStrChar = ch;
+                        } else if (ch == '(') {
+                            depth++;
+                        } else if (ch == ')') {
+                            depth--;
+                        }
+                        k++;
+                    }
+                    sb.append("null");
+                    i = k;
+                    continue;
+                }
+            }
+
+            sb.append(c);
+            i++;
+        }
+        return sb.toString();
     }
 
     /**

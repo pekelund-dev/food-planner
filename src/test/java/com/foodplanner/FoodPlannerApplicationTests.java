@@ -225,6 +225,61 @@ class FoodPlannerApplicationTests {
     }
 
     @Test
+    void sanitizerReplacesUndefinedWithNull() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        String result = service.sanitizeJsToJson("{\"a\":undefined,\"b\":1}");
+        assertEquals("{\"a\":null,\"b\":1}", result);
+    }
+
+    @Test
+    void sanitizerReplacesNewMapWithNull() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        String result = service.sanitizeJsToJson("{\"values\":new Map([])}");
+        assertEquals("{\"values\":null}", result);
+    }
+
+    @Test
+    void sanitizerReplacesNewSetWithNull() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        String result = service.sanitizeJsToJson("{\"values\":new Set([])}");
+        assertEquals("{\"values\":null}", result);
+    }
+
+    @Test
+    void sanitizerDoesNotMangleUndefinedInsideString() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        String result = service.sanitizeJsToJson("{\"a\":\"undefined\"}");
+        assertEquals("{\"a\":\"undefined\"}", result);
+    }
+
+    @Test
+    void sanitizerDoesNotMangleNewInsideString() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        String result = service.sanitizeJsToJson("{\"a\":\"new Map([])\"}");
+        assertEquals("{\"a\":\"new Map([])\"}", result);
+    }
+
+    @Test
+    void sanitizerHandlesStringWithParenInsideConstructorArgs() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        // A paren inside a string inside constructor args must not confuse the depth tracker
+        String result = service.sanitizeJsToJson("{\"x\":new Map([[\")\",1]])}");
+        assertEquals("{\"x\":null}", result);
+    }
+
+    @Test
+    void icaParserHandlesNewMapConstructor() {
+        StoreOfferService service = new StoreOfferTestHelper();
+        // Simulate the real-world data that caused the parse failure
+        String htmlWithNewMap = ICA_HTML_SNIPPET.replace("\"eans\":[{\"image\":\"https://assets.icanet.se/gevalia.jpg\"}]",
+                "\"eans\":[{\"image\":\"https://assets.icanet.se/gevalia.jpg\"}],\"products\":{\"values\":new Map([]),\"products\":{}}");
+        List<StoreOffer> offers = service.parseIcaOffersFromHtml(
+                htmlWithNewMap, "ICA Kvantum Test", "ica-test");
+        // Should still parse all offers successfully
+        assertEquals(2, offers.size());
+    }
+
+    @Test
     void icaParserHandlesPriceRange() {
         StoreOfferService service = new StoreOfferTestHelper();
         String htmlWithRange = ICA_HTML_SNIPPET.replace("\"regularPrice\":\"169,90\"",
