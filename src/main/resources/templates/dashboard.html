@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
-      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
       th:replace="~{fragments/layout :: layout(~{::title}, ~{::main})}"
       lang="en">
 <head>
@@ -8,149 +7,214 @@
 </head>
 <body>
 <main th:fragment="content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <!-- Welcome Header -->
-    <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900">
-            <span th:with="h=${T(java.time.LocalTime).now().hour}"
-                  th:text="${h < 12 ? #messages.msg('dashboard.greeting.morning') : (h < 17 ? #messages.msg('dashboard.greeting.afternoon') : #messages.msg('dashboard.greeting.evening'))}">Hej</span>,
-            <span th:text="${user?.name?.split(' ')[0] ?: 'there'}">User</span>! 👋
-        </h1>
-        <p class="text-gray-500 mt-1" th:text="#{dashboard.subtitle}">Here's your food planning overview</p>
+
+    <!-- Welcome Banner -->
+    <div class="rounded-2xl bg-gradient-to-r from-primary-600 to-primary-700 text-white p-6 sm:p-8 mb-8 shadow-lg">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-bold">
+                    <th:block th:with="h=${T(java.time.LocalTime).now().hour}">
+                        <span th:if="${h lt 12}" th:text="#{dashboard.greeting.morning}">Good morning</span>
+                        <span th:if="${h ge 12 and h lt 17}" th:text="#{dashboard.greeting.afternoon}">Good afternoon</span>
+                        <span th:if="${h ge 17}" th:text="#{dashboard.greeting.evening}">Good evening</span>
+                    </th:block>,
+                    <th:block th:if="${user != null and user.name != null}" th:text="${user.name.split(' ')[0]}">User</th:block>! 👋
+                </h1>
+                <p class="mt-1 text-primary-100" th:text="#{dashboard.subtitle}">Here's your food planning overview</p>
+            </div>
+            <div th:if="${user != null and user.pictureUrl != null}" class="hidden sm:block">
+                <img th:src="${user.pictureUrl}" alt="" class="w-14 h-14 rounded-full border-2 border-white/30 shadow">
+            </div>
+        </div>
     </div>
 
-    <!-- Quick Actions -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-        <a href="/menu" class="card p-6 hover:shadow-md transition-shadow group">
-            <div class="text-3xl mb-3">📅</div>
-            <h3 class="font-bold text-gray-800 group-hover:text-primary-600 transition-colors" th:text="#{card.menu.title}">Weekly Menu</h3>
-            <p class="text-sm text-gray-500 mt-1" th:text="#{card.menu.desc}">View & manage this week's meals</p>
+    <!-- Quick Action Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+        <a href="/menu" class="card p-5 hover:shadow-md transition-shadow group">
+            <div class="flex items-center space-x-3 mb-2">
+                <span class="text-2xl">📅</span>
+                <h3 class="font-bold text-gray-800 group-hover:text-primary-600 transition-colors" th:text="#{card.menu.title}">Weekly Menu</h3>
+            </div>
+            <p class="text-sm text-gray-500" th:text="#{card.menu.desc}">View &amp; manage this week's meals</p>
         </a>
-        <a href="/recipes" class="card p-6 hover:shadow-md transition-shadow group">
-            <div class="text-3xl mb-3">📖</div>
-            <h3 class="font-bold text-gray-800 group-hover:text-primary-600 transition-colors" th:text="#{card.recipes.title}">Recipes</h3>
-            <p class="text-sm text-gray-500 mt-1" th:text="#{card.recipes.desc}">Browse & create recipes</p>
+        <a href="/recipes" class="card p-5 hover:shadow-md transition-shadow group">
+            <div class="flex items-center space-x-3 mb-2">
+                <span class="text-2xl">📖</span>
+                <h3 class="font-bold text-gray-800 group-hover:text-primary-600 transition-colors" th:text="#{card.recipes.title}">Recipes</h3>
+            </div>
+            <p class="text-sm text-gray-500" th:text="#{card.recipes.desc}">Browse &amp; create recipes</p>
         </a>
-        <a href="/shopping" class="card p-6 hover:shadow-md transition-shadow group">
-            <div class="text-3xl mb-3">🛒</div>
-            <h3 class="font-bold text-gray-800 group-hover:text-primary-600 transition-colors" th:text="#{card.shopping.title}">Shopping Lists</h3>
-            <p class="text-sm text-gray-500 mt-1" th:text="#{card.shopping.desc}">View your shopping lists</p>
+        <a href="/shopping" class="card p-5 hover:shadow-md transition-shadow group">
+            <div class="flex items-center space-x-3 mb-2">
+                <span class="text-2xl">🛒</span>
+                <h3 class="font-bold text-gray-800 group-hover:text-primary-600 transition-colors" th:text="#{card.shopping.title}">Shopping Lists</h3>
+            </div>
+            <p class="text-sm text-gray-500" th:text="#{card.shopping.desc}">View your shopping lists</p>
         </a>
-        <a href="/stores" class="card p-6 hover:shadow-md transition-shadow group">
-            <div class="text-3xl mb-3">🏪</div>
-            <h3 class="font-bold text-gray-800 group-hover:text-primary-600 transition-colors" th:text="#{card.offers.title}">Store Offers</h3>
-            <p class="text-sm text-gray-500 mt-1" th:text="#{card.offers.desc}">Current discounts & deals</p>
+        <a href="/stores" class="card p-5 hover:shadow-md transition-shadow group">
+            <div class="flex items-center space-x-3 mb-2">
+                <span class="text-2xl">🏪</span>
+                <h3 class="font-bold text-gray-800 group-hover:text-primary-600 transition-colors" th:text="#{card.offers.title}">Store Offers</h3>
+            </div>
+            <p class="text-sm text-gray-500" th:text="#{card.offers.desc}">Current discounts &amp; deals</p>
         </a>
     </div>
 
+    <!-- Main Content Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <!-- Current Week Menu -->
+
+        <!-- Left Column: This Week's Menu -->
         <div class="lg:col-span-2">
             <div class="flex items-center justify-between mb-4">
-                <h2 class="text-xl font-bold text-gray-800" th:text="#{dashboard.menu.title}">This Week's Menu</h2>
-                <div class="flex items-center space-x-2">
-                    <a href="/menu" class="text-sm text-primary-600 hover:text-primary-700 font-medium" th:text="#{dashboard.menu.link}">View all →</a>
-                </div>
+                <h2 class="text-xl font-bold text-gray-800 flex items-center space-x-2">
+                    <span>📅</span>
+                    <span th:text="#{dashboard.menu.title}">This Week's Menu</span>
+                </h2>
+                <a href="/menu" class="text-sm text-primary-600 hover:text-primary-700 font-medium" th:text="#{dashboard.menu.link}">View all →</a>
             </div>
 
-            <div th:if="${currentMenu == null}" class="card p-8 text-center">
-                <div class="text-5xl mb-4">🤖</div>
+            <!-- Empty state: no menu -->
+            <div th:if="${currentMenu == null}" class="card p-10 text-center">
+                <div class="text-6xl mb-4">🤖</div>
                 <h3 class="text-xl font-bold text-gray-700 mb-2" th:text="#{dashboard.menu.empty.title}">No menu for this week yet</h3>
-                <p class="text-gray-500 mb-6" th:text="#{dashboard.menu.empty.desc}">Let Gemini AI create a personalized menu for you</p>
+                <p class="text-gray-500 mb-6 max-w-md mx-auto" th:text="#{dashboard.menu.empty.desc}">Let Gemini AI create a personalized menu for you</p>
                 <form action="/menu/generate" method="post">
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                    <button type="submit"
-                            class="btn-primary inline-flex items-center space-x-2">
+                    <button type="submit" class="btn-primary inline-flex items-center space-x-2">
                         <span>✨</span>
                         <span th:text="#{dashboard.menu.generate}">Generate with AI</span>
                     </button>
                 </form>
             </div>
 
-            <div th:if="${currentMenu != null}" class="card divide-y divide-gray-100">
-                <div th:each="entry : ${currentMenu.days}"
-                     class="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-2 h-2 rounded-full bg-primary-500"></div>
-                        <span class="text-sm font-semibold text-gray-500 w-24"
-                              th:text="${entry.key.substring(0,3)}">MON</span>
-                        <span class="font-medium text-gray-800"
-                              th:text="${entry.value?.dinner?.get(0)?.mealName} ?: #{dashboard.menu.nomeal}">Meal name</span>
+            <!-- Menu present -->
+            <th:block th:if="${currentMenu != null}">
+                <div class="card overflow-hidden">
+                    <div class="divide-y divide-gray-100">
+                        <th:block th:if="${currentMenu.days != null}" th:each="entry : ${currentMenu.days}">
+                            <div class="px-5 py-4 hover:bg-gray-50 transition-colors">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-3 min-w-0">
+                                        <span class="inline-block w-2.5 h-2.5 rounded-full bg-primary-500 flex-shrink-0"></span>
+                                        <span class="text-xs font-bold text-gray-400 uppercase tracking-wide w-12 flex-shrink-0"
+                                              th:text="${entry.key.length() > 3 ? entry.key.substring(0,3) : entry.key}">MON</span>
+                                        <th:block th:with="dinnerMeals=${entry.value?.dinner}">
+                                            <th:block th:if="${dinnerMeals != null and !dinnerMeals.isEmpty()}">
+                                                <span class="font-medium text-gray-800 truncate"
+                                                      th:text="${dinnerMeals[0].mealName}">Meal name</span>
+                                            </th:block>
+                                            <th:block th:if="${dinnerMeals == null or dinnerMeals.isEmpty()}">
+                                                <span class="text-gray-400 italic" th:text="#{dashboard.menu.nomeal}">No meal planned</span>
+                                            </th:block>
+                                        </th:block>
+                                    </div>
+                                    <th:block th:with="dinnerMeals=${entry.value?.dinner}">
+                                        <th:block th:if="${dinnerMeals != null and !dinnerMeals.isEmpty() and dinnerMeals[0].completed}">
+                                            <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium flex-shrink-0"
+                                                  th:text="#{dashboard.menu.done}">Done ✓</span>
+                                        </th:block>
+                                    </th:block>
+                                </div>
+                            </div>
+                        </th:block>
                     </div>
-                    <span th:if="${entry.value?.dinner?.get(0)?.completed}"
-                          class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium" th:text="#{dashboard.menu.done}">Done ✓</span>
+                    <div class="px-5 py-4 bg-gray-50 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                        <form action="/menu/generate" method="post">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <button type="submit" class="text-sm text-primary-600 hover:text-primary-700 font-medium inline-flex items-center space-x-1">
+                                <span>✨</span><span th:text="#{dashboard.menu.regenerate}">Regenerate with AI</span>
+                            </button>
+                        </form>
+                        <th:block th:if="${currentWeekId != null}">
+                            <form th:action="'/shopping/generate/' + ${currentWeekId}" method="post">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <button type="submit" class="text-sm text-blue-600 hover:text-blue-700 font-medium inline-flex items-center space-x-1">
+                                    <span>🛒</span><span th:text="#{dashboard.menu.shopping}">Generate shopping list</span>
+                                </button>
+                            </form>
+                        </th:block>
+                    </div>
                 </div>
-
-                <div class="px-6 py-4 bg-gray-50 flex items-center justify-between">
-                    <form action="/menu/generate" method="post">
-                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                        <button type="submit" class="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center space-x-1">
-                            <span>✨</span><span th:text="#{dashboard.menu.regenerate}">Regenerate with AI</span>
-                        </button>
-                    </form>
-                    <form th:action="'/shopping/generate/' + ${currentWeekId}" method="post">
-                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                        <button type="submit" class="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center space-x-1">
-                            <span>🛒</span><span th:text="#{dashboard.menu.shopping}">Generate shopping list</span>
-                        </button>
-                    </form>
-                </div>
-            </div>
+            </th:block>
         </div>
 
-        <!-- Sidebar -->
+        <!-- Right Column: Shopping Lists + Settings -->
         <div class="space-y-6">
+
             <!-- Shopping Lists -->
             <div>
                 <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-xl font-bold text-gray-800" th:text="#{dashboard.shopping.title}">Shopping Lists</h2>
+                    <h2 class="text-xl font-bold text-gray-800 flex items-center space-x-2">
+                        <span>🛒</span>
+                        <span th:text="#{dashboard.shopping.title}">Shopping Lists</span>
+                    </h2>
                     <a href="/shopping" class="text-sm text-primary-600 hover:text-primary-700 font-medium" th:text="#{dashboard.shopping.link}">View all →</a>
                 </div>
 
-                <div th:if="${#lists.isEmpty(shoppingLists)}" class="card p-6 text-center text-gray-500 text-sm">
-                    <div class="text-3xl mb-2">🛒</div>
-                    <p th:text="#{dashboard.shopping.empty}">No shopping lists yet</p>
+                <!-- Empty state -->
+                <div th:if="${shoppingLists == null or shoppingLists.isEmpty()}" class="card p-6 text-center">
+                    <div class="text-4xl mb-2">🛒</div>
+                    <p class="text-gray-500 text-sm" th:text="#{dashboard.shopping.empty}">No shopping lists yet</p>
                 </div>
 
-                <div th:if="${!#lists.isEmpty(shoppingLists)}" class="space-y-3">
-                    <a th:each="list, stat : ${shoppingLists}"
-                       th:if="${stat.index < 3}"
-                       th:href="'/shopping/' + ${list.id}"
-                       class="card block p-4 hover:shadow-md transition-shadow">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="font-medium text-gray-800 text-sm" th:text="${list.name}">Shopping List</p>
-                                <p class="text-xs text-gray-500 mt-0.5"
-                                   th:text="${list.checkedCount + '/' + (list.items != null ? list.items.size() : 0)}">0/0</p>
+                <!-- Shopping list items -->
+                <div th:if="${shoppingLists != null and !shoppingLists.isEmpty()}" class="space-y-3">
+                    <th:block th:each="list, stat : ${shoppingLists}" th:if="${stat.index lt 3}">
+                        <a th:href="'/shopping/' + ${list.id}" class="card block p-4 hover:shadow-md transition-shadow">
+                            <div class="flex items-center justify-between">
+                                <div class="min-w-0">
+                                    <p class="font-medium text-gray-800 text-sm truncate" th:text="${list.name ?: 'Shopping List'}">Shopping List</p>
+                                    <p class="text-xs text-gray-400 mt-0.5">
+                                        <span th:text="${list.checkedCount}">0</span>/<span th:text="${list.items != null ? list.items.size() : 0}">0</span>
+                                    </p>
+                                </div>
+                                <th:block th:if="${list.completed}">
+                                    <span class="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium flex-shrink-0"
+                                          th:text="#{dashboard.shopping.done}">Done</span>
+                                </th:block>
+                                <th:block th:if="${!list.completed}">
+                                    <span class="text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-medium flex-shrink-0"
+                                          th:text="#{dashboard.shopping.active}">Active</span>
+                                </th:block>
                             </div>
-                            <span th:if="${list.completed}"
-                                  class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full" th:text="#{dashboard.shopping.done}">Done</span>
-                            <span th:unless="${list.completed}"
-                                  class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full" th:text="#{dashboard.shopping.active}">Active</span>
-                        </div>
-                    </a>
+                        </a>
+                    </th:block>
                 </div>
             </div>
 
-            <!-- Quick Config -->
+            <!-- Menu Settings Summary -->
             <div class="card p-6">
-                <h3 class="font-bold text-gray-800 mb-3" th:text="#{dashboard.config.title}">Menu Settings</h3>
-                <div class="space-y-2 text-sm text-gray-600">
-                    <div class="flex items-center justify-between">
-                        <span th:text="#{dashboard.config.people}">People</span>
-                        <span class="font-medium" th:text="${user?.menuConfig?.numberOfPeople ?: 2}">2</span>
+                <h3 class="font-bold text-gray-800 mb-4 flex items-center space-x-2">
+                    <span>⚙️</span>
+                    <span th:text="#{dashboard.config.title}">Menu Settings</span>
+                </h3>
+                <th:block th:with="config=${user?.menuConfig}">
+                    <div class="space-y-3 text-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-500" th:text="#{dashboard.config.people}">People</span>
+                            <span class="font-semibold text-gray-800" th:text="${config != null ? config.numberOfPeople : 2}">2</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-500" th:text="#{dashboard.config.budget}">Budget friendly</span>
+                            <th:block th:if="${config != null and config.preferBudgetFriendly}">
+                                <span class="font-semibold text-green-600" th:text="#{dashboard.config.yes}">Yes</span>
+                            </th:block>
+                            <th:block th:if="${config == null or !config.preferBudgetFriendly}">
+                                <span class="font-semibold text-gray-400" th:text="#{dashboard.config.no}">No</span>
+                            </th:block>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-500" th:text="#{dashboard.config.offers}">Use offers</span>
+                            <th:block th:if="${config != null and config.useStoreOffers}">
+                                <span class="font-semibold text-green-600" th:text="#{dashboard.config.yes}">Yes</span>
+                            </th:block>
+                            <th:block th:if="${config == null or !config.useStoreOffers}">
+                                <span class="font-semibold text-gray-400" th:text="#{dashboard.config.no}">No</span>
+                            </th:block>
+                        </div>
                     </div>
-                    <div class="flex items-center justify-between">
-                        <span th:text="#{dashboard.config.budget}">Budget friendly</span>
-                        <span class="font-medium"
-                              th:text="${user?.menuConfig?.preferBudgetFriendly ? #{dashboard.config.yes} : #{dashboard.config.no}}">Yes</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span th:text="#{dashboard.config.offers}">Use offers</span>
-                        <span class="font-medium"
-                              th:text="${user?.menuConfig?.useStoreOffers ? #{dashboard.config.yes} : #{dashboard.config.no}}">Yes</span>
-                    </div>
-                </div>
-                <a href="/menu/config" class="btn-secondary w-full text-center mt-4 text-sm block"
+                </th:block>
+                <a href="/menu/config" class="btn-secondary w-full text-center mt-5 text-sm block"
                    th:text="#{dashboard.config.button}">Configure Menu</a>
             </div>
         </div>
