@@ -12,6 +12,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/stores")
@@ -45,7 +46,23 @@ public class StoreController {
             allOffers.addAll(storeOfferService.getActiveOffers(store.getId()));
         }
 
-        model.addAttribute("offers", allOffers);
+        // Flat list sorted by product name (used by the "sort by name" view)
+        List<StoreOffer> offersSortedByName = allOffers.stream()
+                .sorted(Comparator.comparing(StoreOffer::getProductName,
+                        Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                .collect(Collectors.toList());
+
+        // Grouped map: category → offers sorted by name (TreeMap gives alphabetical category order)
+        Map<String, List<StoreOffer>> offersByCategory = offersSortedByName.stream()
+                .collect(Collectors.groupingBy(
+                        o -> o.getProductCategory() != null && !o.getProductCategory().isBlank()
+                                ? o.getProductCategory() : "Other",
+                        TreeMap::new,
+                        Collectors.toList()
+                ));
+
+        model.addAttribute("offers", offersSortedByName);
+        model.addAttribute("offersByCategory", offersByCategory);
         model.addAttribute("selectedStores", selectedStores);
         model.addAttribute("availableStores", storeOfferService.getAvailableStores());
         return "stores/offers";

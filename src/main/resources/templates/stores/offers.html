@@ -65,32 +65,129 @@
 
         <!-- Offers grid -->
         <div th:if="${!#lists.isEmpty(offers)}">
-            <h2 class="text-xl font-bold text-gray-800 mb-4" th:text="#{stores.offers.title}">Current Offers</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                <div th:each="offer : ${offers}"
-                     class="card p-4 hover:shadow-md transition-shadow">
-                    <div class="flex items-start justify-between mb-2">
-                        <h3 class="font-medium text-gray-800 text-sm" th:text="${offer.productName}">Product</h3>
-                        <span th:if="${offer.discountPercent > 0}"
-                              class="ml-2 bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0"
-                              th:text="${'-' + #numbers.formatDecimal(offer.discountPercent, 1, 0) + '%'}">-20%</span>
-                    </div>
-                    <p class="text-xs text-gray-500 mb-1" th:text="${offer.storeName}">Store</p>
-                    <p th:if="${offer.offerDescription != null and !offer.offerDescription.isEmpty()}"
-                       class="text-xs font-semibold text-green-700 bg-green-50 rounded px-1.5 py-0.5 mb-2 inline-block"
-                       th:text="${offer.offerDescription}">2 för 25 kr</p>
-                    <div class="flex items-baseline space-x-2">
-                        <span class="text-xl font-bold text-primary-600"
-                              th:text="${#numbers.formatDecimal(offer.salePrice, 1, 2) + ' kr'}">49.90 kr</span>
-                        <span th:if="${offer.originalPrice > 0}"
-                              class="text-sm text-gray-400 line-through"
-                              th:text="${#numbers.formatDecimal(offer.originalPrice, 1, 2) + ' kr'}">69 kr</span>
-                    </div>
-                    <p th:if="${offer.validTo != null}"
-                       class="text-xs text-gray-400 mt-2"
-                       th:text="#{stores.offers.validuntil} + ' ' + ${#temporals.format(offer.validTo, 'MMM d')}">Valid until: Jan 7</p>
+            <!-- Sort controls -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
+                <h2 class="text-xl font-bold text-gray-800" th:text="#{stores.offers.title}">Current Offers</h2>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-500" th:text="#{stores.sort.label}">Sort:</span>
+                    <button id="btn-sort-group" onclick="setSortMode('group')"
+                            class="text-xs font-medium px-3 py-1.5 rounded-full bg-primary-600 text-white"
+                            th:text="#{stores.sort.group}">Group</button>
+                    <button id="btn-sort-name" onclick="setSortMode('name')"
+                            class="text-xs font-medium px-3 py-1.5 rounded-full bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+                            th:text="#{stores.sort.name}">Name</button>
                 </div>
             </div>
+
+            <!-- Grouped view (default) -->
+            <div id="view-grouped" class="space-y-4">
+                <div th:each="entry : ${offersByCategory}">
+                    <button class="w-full flex items-center justify-between px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors"
+                            onclick="toggleGroup(this)">
+                        <span class="font-semibold text-gray-700" th:text="${entry.key}">Category</span>
+                        <span class="flex items-center gap-2">
+                            <span class="text-xs text-gray-400"
+                                  th:text="${#lists.size(entry.value)} + ' ' + #{stores.offers.count}">5 offers</span>
+                            <span class="toggle-icon text-gray-500">▾</span>
+                        </span>
+                    </button>
+                    <div class="group-body grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-3">
+                        <div th:each="offer : ${entry.value}"
+                             class="card p-4 hover:shadow-md transition-shadow flex flex-col">
+                            <img th:if="${offer.imageUrl != null and !offer.imageUrl.isEmpty()}"
+                                 th:src="${offer.imageUrl}" th:alt="${offer.productName}"
+                                 class="w-full h-28 object-contain mb-3 rounded-lg bg-gray-50" loading="lazy" />
+                            <div class="flex items-start justify-between mb-1">
+                                <h3 class="font-medium text-gray-800 text-sm leading-snug" th:text="${offer.productName}">Product</h3>
+                                <span th:if="${offer.discountPercent > 0}"
+                                      class="ml-2 bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                                      th:text="${'-' + #numbers.formatDecimal(offer.discountPercent, 1, 0) + '%'}">-20%</span>
+                            </div>
+                            <p class="text-xs text-gray-500 mb-1" th:text="${offer.storeName}">Store</p>
+                            <p th:if="${offer.offerDescription != null and !offer.offerDescription.isEmpty()}"
+                               class="text-xs font-semibold text-green-700 bg-green-50 rounded px-1.5 py-0.5 mb-2 inline-block"
+                               th:text="${offer.offerDescription}">2 för 25 kr</p>
+                            <div class="flex items-baseline space-x-2 mt-auto">
+                                <span class="text-xl font-bold text-primary-600"
+                                      th:text="${#numbers.formatDecimal(offer.salePrice, 1, 2) + ' kr'}">49.90 kr</span>
+                                <span th:if="${offer.originalPrice > 0}"
+                                      class="text-sm text-gray-400 line-through"
+                                      th:text="${#numbers.formatDecimal(offer.originalPrice, 1, 2) + ' kr'}">69 kr</span>
+                            </div>
+                            <p th:if="${offer.validTo != null}"
+                               class="text-xs text-gray-400 mt-2"
+                               th:text="#{stores.offers.validuntil} + ' ' + ${#temporals.format(offer.validTo, 'MMM d')}">Valid until: Jan 7</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Flat name-sorted view (hidden by default) -->
+            <div id="view-flat" class="hidden">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <div th:each="offer : ${offers}"
+                         class="card p-4 hover:shadow-md transition-shadow flex flex-col">
+                        <img th:if="${offer.imageUrl != null and !offer.imageUrl.isEmpty()}"
+                             th:src="${offer.imageUrl}" th:alt="${offer.productName}"
+                             class="w-full h-28 object-contain mb-3 rounded-lg bg-gray-50" loading="lazy" />
+                        <div class="flex items-start justify-between mb-1">
+                            <h3 class="font-medium text-gray-800 text-sm leading-snug" th:text="${offer.productName}">Product</h3>
+                            <span th:if="${offer.discountPercent > 0}"
+                                  class="ml-2 bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                                  th:text="${'-' + #numbers.formatDecimal(offer.discountPercent, 1, 0) + '%'}">-20%</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mb-1" th:text="${offer.storeName}">Store</p>
+                        <p th:if="${offer.offerDescription != null and !offer.offerDescription.isEmpty()}"
+                           class="text-xs font-semibold text-green-700 bg-green-50 rounded px-1.5 py-0.5 mb-2 inline-block"
+                           th:text="${offer.offerDescription}">2 för 25 kr</p>
+                        <div class="flex items-baseline space-x-2 mt-auto">
+                            <span class="text-xl font-bold text-primary-600"
+                                  th:text="${#numbers.formatDecimal(offer.salePrice, 1, 2) + ' kr'}">49.90 kr</span>
+                            <span th:if="${offer.originalPrice > 0}"
+                                  class="text-sm text-gray-400 line-through"
+                                  th:text="${#numbers.formatDecimal(offer.originalPrice, 1, 2) + ' kr'}">69 kr</span>
+                        </div>
+                        <p th:if="${offer.validTo != null}"
+                           class="text-xs text-gray-400 mt-2"
+                           th:text="#{stores.offers.validuntil} + ' ' + ${#temporals.format(offer.validTo, 'MMM d')}">Valid until: Jan 7</p>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                const SORT_BTN_ACTIVE = 'text-xs font-medium px-3 py-1.5 rounded-full bg-primary-600 text-white';
+                const SORT_BTN_INACTIVE = 'text-xs font-medium px-3 py-1.5 rounded-full bg-white border border-gray-300 text-gray-600 hover:bg-gray-50';
+
+                function toggleGroup(btn) {
+                    const body = btn.nextElementSibling;
+                    const icon = btn.querySelector('.toggle-icon');
+                    if (body.classList.contains('hidden')) {
+                        body.classList.remove('hidden');
+                        icon.textContent = '▾';
+                    } else {
+                        body.classList.add('hidden');
+                        icon.textContent = '▸';
+                    }
+                }
+
+                function setSortMode(mode) {
+                    const grouped = document.getElementById('view-grouped');
+                    const flat = document.getElementById('view-flat');
+                    const btnGroup = document.getElementById('btn-sort-group');
+                    const btnName = document.getElementById('btn-sort-name');
+                    if (mode === 'name') {
+                        grouped.classList.add('hidden');
+                        flat.classList.remove('hidden');
+                        btnName.className = SORT_BTN_ACTIVE;
+                        btnGroup.className = SORT_BTN_INACTIVE;
+                    } else {
+                        flat.classList.add('hidden');
+                        grouped.classList.remove('hidden');
+                        btnGroup.className = SORT_BTN_ACTIVE;
+                        btnName.className = SORT_BTN_INACTIVE;
+                    }
+                }
+            </script>
         </div>
     </div>
 </main>
