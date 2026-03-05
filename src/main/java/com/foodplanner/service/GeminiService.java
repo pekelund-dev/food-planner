@@ -1,13 +1,12 @@
 package com.foodplanner.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.foodplanner.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 
 import org.springframework.web.context.request.RequestContextHolder;
@@ -28,9 +27,25 @@ public class GeminiService {
     private static final Logger log = LoggerFactory.getLogger(GeminiService.class);
 
     private final ChatClient chatClient;
-    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     private static final String[] DAYS = {"MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"};
+
+    // ---- DTOs for structured AI responses ----
+
+    private record MenuResponse(Map<String, DayMenuDto> days) {}
+    private record DayMenuDto(List<PlannedMealDto> dinner) {}
+    private record PlannedMealDto(String mealName, String description, double estimatedCost) {}
+    private record SingleMealDto(String mealName, String description, double estimatedCost) {}
+    private record RecipeDto(String name, String description, int servings,
+                             int prepTimeMinutes, int cookTimeMinutes, String difficulty,
+                             List<IngredientDto> ingredients, List<String> instructions,
+                             List<String> tags) {}
+    private record IngredientDto(String name, double amount, String unit) {}
+    private record ShoppingItemDto(String name, double amount, String unit,
+                                   String category, boolean onSale, String storeName) {}
+    private record StoreOfferDto(String productName, double salePrice, double originalPrice,
+                                  double discountPercent, String productCategory,
+                                  String unit, String offerDescription) {}
 
     private final LocaleResolver localeResolver;
 
@@ -90,9 +105,14 @@ public class GeminiService {
             return buildSampleMenu(userId, config);
         }
 
-        String prompt = buildMenuPrompt(config, currentOffers, feedback);
-        String response = callAi(prompt, config.getGeminiModel());
-        return parseMenuResponse(userId, response, config);
+        try {
+            String prompt = buildMenuPrompt(config, currentOffers, feedback);
+            MenuResponse dto = callAi(prompt, config.getGeminiModel(), MenuResponse.class);
+            return mapToMenu(userId, dto, config);
+        } catch (Exception e) {
+            log.error("Failed to generate AI menu response", e);
+            return buildSampleMenu(userId, config);
+        }
     }
 
     /**
@@ -104,9 +124,14 @@ public class GeminiService {
             return buildSampleRecipe(userId, mealName);
         }
 
-        String prompt = buildRecipePrompt(mealName, config, currentOffers);
-        String response = callAi(prompt, config.getGeminiModel());
-        return parseRecipeResponse(userId, mealName, response);
+        try {
+            String prompt = buildRecipePrompt(mealName, config, currentOffers);
+            RecipeDto dto = callAi(prompt, config.getGeminiModel(), RecipeDto.class);
+            return mapToRecipe(userId, mealName, dto);
+        } catch (Exception e) {
+            log.error("Failed to generate AI recipe response", e);
+            return buildSampleRecipe(userId, mealName);
+        }
     }
 
     /**
@@ -120,9 +145,15 @@ public class GeminiService {
             return buildSampleShoppingItems(recipes, offers);
         }
 
-        String prompt = buildShoppingListPrompt(menu, recipes, offers);
-        String response = callAi(prompt, model);
-        return parseShoppingListResponse(response, offers);
+        try {
+            String prompt = buildShoppingListPrompt(menu, recipes, offers);
+            List<ShoppingItemDto> dtos = callAi(prompt, model,
+                    new ParameterizedTypeReference<List<ShoppingItemDto>>() {});
+            return mapToShoppingItems(dtos, offers);
+        } catch (Exception e) {
+            log.error("Failed to generate AI shopping list response", e);
+            return buildSampleShoppingItems(recipes, offers);
+        }
     }
 
     /**
@@ -138,21 +169,45 @@ public class GeminiService {
             meal.setServings(config.getNumberOfPeople());
             return meal;
         }
-        String prompt = buildSingleMealPrompt(currentMealName, config, offers, feedback);
-        String response = callAi(prompt, config.getGeminiModel());
-        return parseSingleMealResponse(response, config.getNumberOfPeople());
+        try {
+            String prompt = buildSingleMealPrompt(currentMealName, config, offers, feedback);
+            SingleMealDto dto = callAi(prompt, config.getGeminiModel(), SingleMealDto.class);
+            return mapToPlannedMeal(dto, config.getNumberOfPeople());
+        } catch (Exception e) {
+            log.error("Failed to generate single meal AI response", e);
+            WeeklyMenu.PlannedMeal meal = new WeeklyMenu.PlannedMeal();
+            meal.setMealName("Replacement Dish");
+            meal.setServings(config.getNumberOfPeople());
+            return meal;
+        }
     }
 
     /**
-     * Invoke the Spring AI ChatClient and return the raw text response.
+     * Invoke the Spring AI ChatClient and return a structured response of the given type.
      */
-    private String callAi(String prompt, String model) {
+    private <T> T callAi(String prompt, String model, Class<T> responseType) {
         try {
             return chatClient.prompt()
                     .user(prompt)
                     .options(GoogleGenAiChatOptions.builder().model(model).build())
                     .call()
-                    .content();
+                    .entity(responseType);
+        } catch (Exception e) {
+            log.error("Error calling AI model via Spring AI", e);
+            throw new RuntimeException("AI call failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Invoke the Spring AI ChatClient and return a structured list response.
+     */
+    private <T> T callAi(String prompt, String model, ParameterizedTypeReference<T> typeRef) {
+        try {
+            return chatClient.prompt()
+                    .user(prompt)
+                    .options(GoogleGenAiChatOptions.builder().model(model).build())
+                    .call()
+                    .entity(typeRef);
         } catch (Exception e) {
             log.error("Error calling AI model via Spring AI", e);
             throw new RuntimeException("AI call failed: " + e.getMessage(), e);
@@ -200,15 +255,8 @@ public class GeminiService {
             }
         }
 
-        sb.append("\nReturn a JSON object with this exact structure:\n");
-        sb.append("{\n  \"days\": {\n");
-        for (int i = 0; i < days.length; i++) {
-            sb.append("    \"").append(days[i]).append("\": {\"dinner\": [{\"mealName\": \"string\", \"description\": \"string\", \"estimatedCost\": number}]}");
-            if (i < days.length - 1) sb.append(",");
-            sb.append("\n");
-        }
-        sb.append("  }\n}\n");
-        sb.append("Respond with valid JSON only, no markdown fences.");
+        sb.append("\nProvide dinner meals for these days: ").append(String.join(", ", days)).append(".\n");
+        sb.append("estimatedCost should be in SEK per serving.");
 
         return sb.toString();
     }
@@ -231,19 +279,7 @@ public class GeminiService {
             }
         }
 
-        sb.append("\nReturn a JSON object with this structure:\n");
-        sb.append("{\n");
-        sb.append("  \"name\": \"string\",\n");
-        sb.append("  \"description\": \"string\",\n");
-        sb.append("  \"servings\": number,\n");
-        sb.append("  \"prepTimeMinutes\": number,\n");
-        sb.append("  \"cookTimeMinutes\": number,\n");
-        sb.append("  \"difficulty\": \"EASY|MEDIUM|HARD\",\n");
-        sb.append("  \"ingredients\": [{\"name\": \"string\", \"amount\": number, \"unit\": \"string\"}],\n");
-        sb.append("  \"instructions\": [\"step 1\", \"step 2\"],\n");
-        sb.append("  \"tags\": [\"tag1\", \"tag2\"]\n");
-        sb.append("}\n");
-        sb.append("Respond with valid JSON only, no markdown fences.");
+        sb.append("\ndifficulty must be one of: EASY, MEDIUM, HARD.");
 
         return sb.toString();
     }
@@ -268,22 +304,18 @@ public class GeminiService {
             }
             sb.append("\n");
         }
-        sb.append("\nReturn JSON only: {\"mealName\": \"string\", \"description\": \"string\", \"estimatedCost\": number}\n");
-        sb.append("Respond with valid JSON only, no markdown fences.");
+        sb.append("estimatedCost should be in SEK.");
         return sb.toString();
     }
 
-    private WeeklyMenu.PlannedMeal parseSingleMealResponse(String response, int servings) {
+    private WeeklyMenu.PlannedMeal mapToPlannedMeal(SingleMealDto dto, int servings) {
         WeeklyMenu.PlannedMeal meal = new WeeklyMenu.PlannedMeal();
         meal.setServings(servings);
-        try {
-            String json = stripMarkdownFences(response);
-            JsonNode root = objectMapper.readTree(json);
-            meal.setMealName(root.path("mealName").asText("New Dish"));
-            meal.setDescription(root.path("description").asText(""));
-            meal.setEstimatedCost(root.path("estimatedCost").asDouble(0));
-        } catch (Exception e) {
-            log.error("Failed to parse single meal response", e);
+        if (dto != null) {
+            meal.setMealName(dto.mealName() != null ? dto.mealName() : "Replacement Dish");
+            meal.setDescription(dto.description() != null ? dto.description() : "");
+            meal.setEstimatedCost(dto.estimatedCost());
+        } else {
             meal.setMealName("Replacement Dish");
         }
         return meal;
@@ -340,225 +372,93 @@ public class GeminiService {
 
         sb.append("\nConsolidate all ingredients into a single shopping list. ");
         sb.append("Combine duplicates, categorize by section (Produce, Dairy, Meat, Pantry, etc.), ");
-        sb.append("and mark items that are on sale.\n\n");
-        sb.append("Return JSON array only, no markdown fences:\n");
-        sb.append("[{\"name\": \"string\", \"amount\": number, \"unit\": \"string\", \"category\": \"string\", \"onSale\": boolean, \"storeName\": \"string or null\"}]\n");
+        sb.append("and mark items that are on sale.\n");
 
         return sb.toString();
     }
 
-    private WeeklyMenu parseMenuResponse(String userId, String response, MenuConfig config) {
-        try {
-            log.debug("Raw AI menu response (length={}): {}", response == null ? 0 : response.length(), response);
-            String json = stripMarkdownFences(response);
-            JsonNode root = objectMapper.readTree(json);
-            WeeklyMenu menu = new WeeklyMenu();
-            menu.setUserId(userId);
-            menu.setAiGenerated(true);
+    private WeeklyMenu mapToMenu(String userId, MenuResponse dto, MenuConfig config) {
+        WeeklyMenu menu = new WeeklyMenu();
+        menu.setUserId(userId);
+        menu.setAiGenerated(true);
 
-            LocalDate nextMonday = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY));
-            menu.setWeekStart(nextMonday);
-            menu.setWeekEnd(nextMonday.plusDays(6));
-            menu.setWeekId(MenuService.formatWeekId(nextMonday));
+        LocalDate nextMonday = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY));
+        menu.setWeekStart(nextMonday);
+        menu.setWeekEnd(nextMonday.plusDays(6));
+        menu.setWeekId(MenuService.formatWeekId(nextMonday));
 
-            Map<String, WeeklyMenu.DayMenu> days = new LinkedHashMap<>();
-            JsonNode daysNode = root.path("days");
-            int servings = config.getNumberOfPeople();
-            for (String day : DAYS) {
-                JsonNode dayNode = daysNode.path(day);
-                WeeklyMenu.DayMenu dayMenu = new WeeklyMenu.DayMenu();
-                if (!dayNode.isMissingNode()) {
-                    dayMenu.setDinner(parsePlannedMeals(dayNode.path("dinner"), servings));
-                    dayMenu.setLunch(parsePlannedMeals(dayNode.path("lunch"), servings));
-                    dayMenu.setBreakfast(parsePlannedMeals(dayNode.path("breakfast"), servings));
-                }
-                days.put(day, dayMenu);
+        Map<String, WeeklyMenu.DayMenu> days = new LinkedHashMap<>();
+        Map<String, DayMenuDto> daysDto = (dto != null && dto.days() != null) ? dto.days() : Map.of();
+        int servings = config.getNumberOfPeople();
+        for (String day : DAYS) {
+            WeeklyMenu.DayMenu dayMenu = new WeeklyMenu.DayMenu();
+            DayMenuDto dayDto = daysDto.get(day);
+            if (dayDto != null) {
+                dayMenu.setDinner(mapToPlannedMeals(dayDto.dinner(), servings));
             }
-            menu.setDays(days);
-            return menu;
-        } catch (Exception e) {
-            log.error("Failed to parse AI menu response", e);
-            return buildSampleMenu(userId, config);
+            days.put(day, dayMenu);
         }
+        menu.setDays(days);
+        return menu;
     }
 
-    private List<WeeklyMenu.PlannedMeal> parsePlannedMeals(JsonNode mealsNode, int servings) {
-        List<WeeklyMenu.PlannedMeal> meals = new ArrayList<>();
-        if (mealsNode.isArray()) {
-            for (JsonNode mealNode : mealsNode) {
-                WeeklyMenu.PlannedMeal meal = new WeeklyMenu.PlannedMeal();
-                meal.setMealName(mealNode.path("mealName").asText("Unknown meal"));
-                meal.setDescription(mealNode.path("description").asText(""));
-                meal.setEstimatedCost(mealNode.path("estimatedCost").asDouble(0));
-                meal.setServings(servings);
-                meals.add(meal);
-            }
-        }
-        return meals;
+    private List<WeeklyMenu.PlannedMeal> mapToPlannedMeals(List<PlannedMealDto> dtos, int servings) {
+        if (dtos == null) return List.of();
+        return dtos.stream().map(dto -> {
+            WeeklyMenu.PlannedMeal meal = new WeeklyMenu.PlannedMeal();
+            meal.setMealName(dto.mealName() != null ? dto.mealName() : "Unknown meal");
+            meal.setDescription(dto.description() != null ? dto.description() : "");
+            meal.setEstimatedCost(dto.estimatedCost());
+            meal.setServings(servings);
+            return meal;
+        }).toList();
     }
 
-    private Recipe parseRecipeResponse(String userId, String mealName, String response) {
-        try {
-            log.debug("Raw AI recipe response (length={}): {}", response == null ? 0 : response.length(), response);
-            String json = stripMarkdownFences(response);
-            JsonNode root = objectMapper.readTree(json);
-            Recipe recipe = new Recipe();
-            recipe.setUserId(userId);
-            recipe.setName(root.path("name").asText(mealName));
-            recipe.setDescription(root.path("description").asText(""));
-            recipe.setServings(root.path("servings").asInt(2));
-            recipe.setPrepTimeMinutes(root.path("prepTimeMinutes").asInt(15));
-            recipe.setCookTimeMinutes(root.path("cookTimeMinutes").asInt(30));
-
-            String diffStr = root.path("difficulty").asText("MEDIUM");
+    private Recipe mapToRecipe(String userId, String mealName, RecipeDto dto) {
+        if (dto == null) return buildSampleRecipe(userId, mealName);
+        Recipe recipe = new Recipe();
+        recipe.setUserId(userId);
+        recipe.setName(dto.name() != null ? dto.name() : mealName);
+        recipe.setDescription(dto.description() != null ? dto.description() : "");
+        recipe.setServings(dto.servings() > 0 ? dto.servings() : 2);
+        recipe.setPrepTimeMinutes(dto.prepTimeMinutes() > 0 ? dto.prepTimeMinutes() : 15);
+        recipe.setCookTimeMinutes(dto.cookTimeMinutes() > 0 ? dto.cookTimeMinutes() : 30);
+        if (dto.difficulty() != null) {
             try {
-                recipe.setDifficulty(Recipe.DifficultyLevel.valueOf(diffStr.toUpperCase()));
+                recipe.setDifficulty(Recipe.DifficultyLevel.valueOf(dto.difficulty().toUpperCase()));
             } catch (IllegalArgumentException e) {
                 recipe.setDifficulty(Recipe.DifficultyLevel.MEDIUM);
             }
-
-            List<Recipe.Ingredient> ingredients = new ArrayList<>();
-            JsonNode ingsNode = root.path("ingredients");
-            if (ingsNode.isArray()) {
-                for (JsonNode ingNode : ingsNode) {
-                    Recipe.Ingredient ing = new Recipe.Ingredient(
-                            ingNode.path("name").asText(),
-                            ingNode.path("amount").asDouble(1),
-                            ingNode.path("unit").asText("")
-                    );
-                    ingredients.add(ing);
-                }
-            }
-            recipe.setIngredients(ingredients);
-
-            List<String> instructions = new ArrayList<>();
-            JsonNode instNode = root.path("instructions");
-            if (instNode.isArray()) {
-                for (JsonNode step : instNode) {
-                    instructions.add(step.asText());
-                }
-            }
-            recipe.setInstructions(instructions);
-
-            List<String> tags = new ArrayList<>();
-            JsonNode tagsNode = root.path("tags");
-            if (tagsNode.isArray()) {
-                for (JsonNode tag : tagsNode) {
-                    tags.add(tag.asText());
-                }
-            }
-            recipe.setTags(tags);
-
-            return recipe;
-        } catch (Exception e) {
-            log.error("Failed to parse AI recipe response", e);
-            return buildSampleRecipe(userId, mealName);
+        } else {
+            recipe.setDifficulty(Recipe.DifficultyLevel.MEDIUM);
         }
+        if (dto.ingredients() != null) {
+            recipe.setIngredients(dto.ingredients().stream()
+                    .map(i -> new Recipe.Ingredient(i.name(), i.amount(), i.unit()))
+                    .toList());
+        } else {
+            recipe.setIngredients(List.of());
+        }
+        recipe.setInstructions(dto.instructions() != null ? dto.instructions() : List.of());
+        recipe.setTags(dto.tags() != null ? dto.tags() : List.of());
+        return recipe;
     }
 
-    private List<ShoppingList.ShoppingItem> parseShoppingListResponse(String response, List<StoreOffer> offers) {
-        try {
-            log.debug("Raw AI shopping list response (length={}): {}", response == null ? 0 : response.length(), response);
-            String json = stripMarkdownFences(response);
-            JsonNode root = objectMapper.readTree(json);
-            List<ShoppingList.ShoppingItem> items = new ArrayList<>();
-            if (root.isArray()) {
-                for (JsonNode itemNode : root) {
-                    ShoppingList.ShoppingItem item = new ShoppingList.ShoppingItem();
-                    item.setId(UUID.randomUUID().toString());
-                    item.setName(itemNode.path("name").asText());
-                    item.setAmount(itemNode.path("amount").asDouble(1));
-                    item.setUnit(itemNode.path("unit").asText(""));
-                    item.setCategory(itemNode.path("category").asText("Other"));
-                    item.setOnSale(itemNode.path("onSale").asBoolean(false));
-                    String storeName = itemNode.path("storeName").asText(null);
-                    if (!"null".equals(storeName)) {
-                        item.setStoreName(storeName);
-                    }
-                    items.add(item);
-                }
+    private List<ShoppingList.ShoppingItem> mapToShoppingItems(List<ShoppingItemDto> dtos, List<StoreOffer> offers) {
+        if (dtos == null) return buildSampleShoppingItems(Map.of(), offers);
+        return dtos.stream().map(dto -> {
+            ShoppingList.ShoppingItem item = new ShoppingList.ShoppingItem();
+            item.setId(UUID.randomUUID().toString());
+            item.setName(dto.name() != null ? dto.name() : "");
+            item.setAmount(dto.amount() > 0 ? dto.amount() : 1);
+            item.setUnit(dto.unit() != null ? dto.unit() : "");
+            item.setCategory(dto.category() != null ? dto.category() : "Other");
+            item.setOnSale(dto.onSale());
+            if (dto.storeName() != null && !"null".equals(dto.storeName())) {
+                item.setStoreName(dto.storeName());
             }
-            return items;
-        } catch (Exception e) {
-            log.error("Failed to parse AI shopping list response", e);
-            return buildSampleShoppingItems(Map.of(), offers);
-        }
-    }
-
-    /** Strip optional markdown code fences that some models still add despite instructions. */
-    private String stripMarkdownFences(String text) {
-        if (text == null) return "{}";
-        String trimmed = text.strip();
-
-        // Handle code fences that may appear anywhere in the response, e.g. when Gemini
-        // adds a preamble like "Here are the offers:\n```json\n[...]\n```"
-        int fenceStart = trimmed.indexOf("```");
-        if (fenceStart >= 0) {
-            // Skip the opening fence line (e.g. ```json or ```)
-            int firstNewline = trimmed.indexOf('\n', fenceStart);
-            int lastFence = trimmed.lastIndexOf("```");
-            if (firstNewline > fenceStart && lastFence > firstNewline) {
-                return trimmed.substring(firstNewline + 1, lastFence).strip();
-            }
-        }
-
-        // Handle a response that starts with [ or { directly.
-        // The AI may return a truncated array (no closing ]) — repair it so Jackson doesn't fail
-        // with JsonEOFException when the response hits the output-token limit mid-array.
-        if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
-            return repairTruncatedJson(trimmed);
-        }
-
-        // Last resort: find first [ or { (JSON array/object start) within the response
-        int arrayStart = trimmed.indexOf('[');
-        int objectStart = trimmed.indexOf('{');
-        if (arrayStart >= 0 || objectStart >= 0) {
-            int jsonStart;
-            if (arrayStart < 0) jsonStart = objectStart;
-            else if (objectStart < 0) jsonStart = arrayStart;
-            else jsonStart = Math.min(arrayStart, objectStart);
-
-            int arrayEnd = trimmed.lastIndexOf(']');
-            int objectEnd = trimmed.lastIndexOf('}');
-            int jsonEnd = Math.max(arrayEnd, objectEnd);
-            if (jsonEnd > jsonStart) {
-                return trimmed.substring(jsonStart, jsonEnd + 1);
-            }
-        }
-
-        return trimmed;
-    }
-
-    /**
-     * Repairs a truncated JSON array or object that was cut off before the closing bracket
-     * (e.g. when the AI response hits the output-token limit mid-array).
-     *
-     * <ul>
-     *   <li>If the response already ends with the correct close bracket — return as-is.
-     *   <li>If the last occurrence of the close bracket is somewhere earlier — truncate there.
-     *   <li>For truncated arrays: find the last complete {@code }} and append {@code ]}.
-     * </ul>
-     */
-    private String repairTruncatedJson(String json) {
-        if (json == null || json.isEmpty()) return json;
-        char expectedClose = json.charAt(0) == '[' ? ']' : '}';
-        // Already ends with the expected close bracket — no repair needed
-        if (json.charAt(json.length() - 1) == expectedClose) return json;
-        // Find the last occurrence of the expected close bracket
-        int lastClose = json.lastIndexOf(expectedClose);
-        if (lastClose > 0) {
-            log.debug("Repairing truncated JSON: truncating at position {} (last '{}')", lastClose + 1, expectedClose);
-            return json.substring(0, lastClose + 1);
-        }
-        // No close bracket at all — for a truncated array, find the last complete object '}'
-        if (json.charAt(0) == '[') {
-            int lastBrace = json.lastIndexOf('}');
-            if (lastBrace > 0) {
-                log.debug("Repairing truncated JSON array: no ']' found, closing after last '}}' at {}", lastBrace + 1);
-                return json.substring(0, lastBrace + 1) + "]";
-            }
-        }
-        return json;
+            return item;
+        }).toList();
     }
 
     // ---- Store offer extraction ----
@@ -631,26 +531,11 @@ public class GeminiService {
                 + "   - Set offerDescription to the verbatim deal text from the page (e.g. \"2 för 25 kr\").\n"
                 + "   - Calculate discountPercent = ((originalPrice - salePrice) / originalPrice) * 100.\n"
                 + "4. For simple price-cut offers, leave offerDescription as an empty string.\n"
-                + "5. productCategory must be one of: Meat, Fish, Dairy, Produce, Pantry, Beverages, Snacks, Bakery, Frozen, Cleaning, Other.\n\n"
-                + "For each offer return these fields:\n"
-                + "- productName: brand + product name (string)\n"
-                + "- salePrice: effective per-unit sale price in SEK (number)\n"
-                + "- originalPrice: normal full price per unit in SEK (number, 0 if not shown)\n"
-                + "- discountPercent: pre-calculated discount percentage (number, 0 if unknown)\n"
-                + "- productCategory: one of the categories above (string)\n"
-                + "- unit: unit of measure (e.g. kg, st, förp, l)\n"
-                + "- offerDescription: verbatim multi-buy deal text, or empty string\n\n"
-                + "Return a JSON array ONLY — no markdown fences, no commentary, no extra whitespace between tokens "
-                + "(compact JSON to maximize the number of offers that fit in the response):\n"
-                + "[{\"productName\":\"string\",\"salePrice\":number,\"originalPrice\":number,"
-                + "\"discountPercent\":number,\"productCategory\":\"string\",\"unit\":\"string\","
-                + "\"offerDescription\":\"string\"}]";
+                + "5. productCategory must be one of: Meat, Fish, Dairy, Produce, Pantry, Beverages, Snacks, Bakery, Frozen, Cleaning, Other.\n";
         try {
-            String response = callAi(prompt, "gemini-2.5-flash");
-            log.info("AI raw response length for '{}': {} chars", storeName,
-                    response != null ? response.length() : 0);
-            log.debug("AI raw response for '{}': {}", storeName, response);
-            List<StoreOffer> offers = parseExtractedOffers(stripMarkdownFences(response), storeName, storeId);
+            List<StoreOfferDto> dtos = callAi(prompt, "gemini-2.5-flash",
+                    new ParameterizedTypeReference<List<StoreOfferDto>>() {});
+            List<StoreOffer> offers = mapToStoreOffers(dtos, storeName, storeId);
             log.info("AI extracted {} offers from page content for store '{}'", offers.size(), storeName);
             return offers;
         } catch (Exception e) {
@@ -670,13 +555,11 @@ public class GeminiService {
                 + storeName + "\"\n\n"
                 + "Use typical Swedish grocery product names and realistic Swedish krona prices.\n"
                 + "Include a variety of categories: Meat, Fish, Dairy, Produce, Pantry, Beverages, Snacks.\n"
-                + "Sale prices should be 10–50% lower than original prices.\n\n"
-                + "Return a JSON array only, no markdown fences:\n"
-                + "[{\"productName\": \"string\", \"salePrice\": number, \"originalPrice\": number, "
-                + "\"productCategory\": \"string\", \"unit\": \"string\"}]";
+                + "Sale prices should be 10–50% lower than original prices.\n";
         try {
-            String response = callAi(prompt, "gemini-2.5-flash");
-            List<StoreOffer> offers = parseExtractedOffers(stripMarkdownFences(response), storeName, storeId);
+            List<StoreOfferDto> dtos = callAi(prompt, "gemini-2.5-flash",
+                    new ParameterizedTypeReference<List<StoreOfferDto>>() {});
+            List<StoreOffer> offers = mapToStoreOffers(dtos, storeName, storeId);
             log.info("Gemini generated {} fallback offers for store '{}'", offers.size(), storeName);
             return offers;
         } catch (Exception e) {
@@ -685,50 +568,36 @@ public class GeminiService {
         }
     }
 
-    private List<StoreOffer> parseExtractedOffers(String json, String storeName, String storeId) {
+    private List<StoreOffer> mapToStoreOffers(List<StoreOfferDto> dtos, String storeName, String storeId) {
+        if (dtos == null) return List.of();
         List<StoreOffer> offers = new ArrayList<>();
-        // Repair truncated JSON arrays before parsing (e.g. response cut off at token limit)
-        String toParse = repairTruncatedJson(json);
-        boolean wasRepaired = !toParse.equals(json);
-        try {
-            JsonNode root = objectMapper.readTree(toParse);
-            if (!root.isArray()) return offers;
-            for (JsonNode node : root) {
-                StoreOffer offer = new StoreOffer();
-                offer.setId(UUID.randomUUID().toString());
-                offer.setStoreId(storeId);
-                offer.setStoreName(storeName);
-                offer.setProductName(node.path("productName").asText(""));
-                offer.setSalePrice(node.path("salePrice").asDouble(0));
-                offer.setOriginalPrice(node.path("originalPrice").asDouble(0));
-                offer.setProductCategory(node.path("productCategory").asText("Other"));
-                offer.setUnit(node.path("unit").asText(""));
-                offer.setOfferDescription(node.path("offerDescription").asText(""));
-                offer.setFetchedAt(Instant.now());
-                offer.setValidFrom(LocalDate.now());
-                offer.setValidTo(LocalDate.now().plusDays(7));
-                // Prefer AI-provided discountPercent: the AI accounts for deal structure
-                // (e.g., for "3 for 2" there's no meaningful originalPrice/salePrice pair),
-                // whereas the simple formula below only works for straightforward price cuts.
-                double aiDiscount = node.path("discountPercent").asDouble(0);
-                if (aiDiscount > 0) {
-                    offer.setDiscountPercent(aiDiscount);
-                } else if (offer.getOriginalPrice() > 0 && offer.getSalePrice() > 0
-                        && offer.getOriginalPrice() > offer.getSalePrice()) {
-                    double discount = ((offer.getOriginalPrice() - offer.getSalePrice())
-                            / offer.getOriginalPrice()) * 100;
-                    offer.setDiscountPercent(discount);
-                }
-                if (!offer.getProductName().isBlank()) {
-                    offers.add(offer);
-                }
+        for (StoreOfferDto dto : dtos) {
+            if (dto.productName() == null || dto.productName().isBlank()) continue;
+            StoreOffer offer = new StoreOffer();
+            offer.setId(UUID.randomUUID().toString());
+            offer.setStoreId(storeId);
+            offer.setStoreName(storeName);
+            offer.setProductName(dto.productName());
+            offer.setSalePrice(dto.salePrice());
+            offer.setOriginalPrice(dto.originalPrice());
+            offer.setProductCategory(dto.productCategory() != null ? dto.productCategory() : "Other");
+            offer.setUnit(dto.unit() != null ? dto.unit() : "");
+            offer.setOfferDescription(dto.offerDescription() != null ? dto.offerDescription() : "");
+            offer.setFetchedAt(Instant.now());
+            offer.setValidFrom(LocalDate.now());
+            offer.setValidTo(LocalDate.now().plusDays(7));
+            // Prefer AI-provided discountPercent: the AI accounts for deal structure
+            // (e.g., for "3 for 2" there's no meaningful originalPrice/salePrice pair),
+            // whereas the simple formula below only works for straightforward price cuts.
+            if (dto.discountPercent() > 0) {
+                offer.setDiscountPercent(dto.discountPercent());
+            } else if (offer.getOriginalPrice() > 0 && offer.getSalePrice() > 0
+                    && offer.getOriginalPrice() > offer.getSalePrice()) {
+                double discount = ((offer.getOriginalPrice() - offer.getSalePrice())
+                        / offer.getOriginalPrice()) * 100;
+                offer.setDiscountPercent(discount);
             }
-            if (wasRepaired) {
-                log.warn("AI response for '{}' was truncated; successfully parsed {} offers from repaired JSON",
-                        storeName, offers.size());
-            }
-        } catch (Exception e) {
-            log.warn("Failed to parse extracted offers JSON", e);
+            offers.add(offer);
         }
         return offers;
     }
